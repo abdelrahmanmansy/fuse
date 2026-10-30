@@ -1,0 +1,23 @@
+# Godot import cache / editor state
+.godot/
+*.translation
+
+# Builds and exports
+build/
+dist/
+export/
+*.pck
+*.exe
+*.apk
+*.aab
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+*.log
+
+# Blender
+*.blend1
+*.blend2
