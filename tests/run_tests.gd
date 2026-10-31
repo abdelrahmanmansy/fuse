@@ -17,6 +17,7 @@ func _initialize() -> void:
 	var assertion_count := 0
 	var all_failures: Array[String] = []
 	var started_at := Time.get_ticks_msec()
+	var verbose := OS.get_cmdline_user_args().has("verbose")
 
 	for path in files:
 		var script: Script = load(path)
@@ -32,6 +33,8 @@ func _initialize() -> void:
 
 		for method in methods:
 			test_count += 1
+			if verbose:
+				print("  RUN  %s::%s" % [path.get_file(), method])
 			var first_assertion: int = instance.assertions
 			var first_failure: int = instance.failures.size()
 			instance.call(method)
