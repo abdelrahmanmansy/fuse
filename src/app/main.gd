@@ -1,12 +1,13 @@
 extends Node3D
-## M1 grey-box game shell: fixed-tick simulation driver + presentation layer.
+## M2 game shell: menu flow + fixed-tick match driver + presentation layer.
 ##
 ## Responsibilities are deliberately split:
 ##   - simulation: src/core (pure, deterministic, tested headless)
 ##   - views:      src/render (read sim state, never write it)
 ##   - input:      src/input (device -> command dictionary)
 ##   - opponent:   src/ai (emits normal commands)
-##   - HUD:        src/ui
+##   - HUD/menus:  src/ui
+##   - flow:       src/app/app_flow.gd (title -> match -> results -> series)
 ##
 ## Debug/automation flags (user args after `--`):
 ##   --shot=<path>        fast-forward a seed and save a PNG, then quit
@@ -23,6 +24,13 @@ const CameraRig = preload("res://src/render/camera_rig.gd")
 const Hud = preload("res://src/ui/hud.gd")
 const InputRouter = preload("res://src/input/input_router.gd")
 const SimpleAi = preload("res://src/ai/simple_ai.gd")
+const AppFlow = preload("res://src/app/app_flow.gd")
+const Settings = preload("res://src/app/settings.gd")
+const AudioDirector = preload("res://src/audio/audio_director.gd")
+const TitleScreen = preload("res://src/ui/screens/title_screen.gd")
+const PauseMenu = preload("res://src/ui/screens/pause_menu.gd")
+const SeriesPanel = preload("res://src/ui/screens/series_panel.gd")
+const SettingsScreen = preload("res://src/ui/screens/settings_screen.gd")
 
 const MatchSim = preload("res://src/core/sim/match_sim.gd")
 const SimEvent = preload("res://src/core/sim/sim_event.gd")
@@ -32,21 +40,26 @@ const ArenaLayout = preload("res://src/core/arena/arena_layout.gd")
 const TICK_DT := 1.0 / 60.0
 const PLAYER_COUNT := 2
 
-enum Mode { ONE_PLAYER, TWO_PLAYER }
-
 var sim
 var rules
 var arena
 var seed_value: int = 4242
 
-var _mode: int = Mode.ONE_PLAYER
+var _flow
+var _settings
 var _paused: bool = false
 var _accum: float = 0.0
+var _round_recorded: bool = false
 
 var _arena_view
 var _camera
 var _entity_root: Node3D
 var _hud
+var _title
+var _pause_menu
+var _series
+var _settings_screen
+var _audio
 
 var _input_router
 var _ai: Dictionary = {}
@@ -62,13 +75,33 @@ var _shot_frames: int = 0
 var _shot_done: bool = false
 var _shot_frozen: bool = false
 
+var _capture_path: String = ""
+var _capture_screen: String = "title"
+var _capture_after: int = 24
+var _capture_frames: int = 0
+var _capture_done: bool = false
+
 
 func _ready() -> void:
 	_parse_args()
+	_settings = Settings.new()
+	_settings.load_settings()
+	_flow = AppFlow.new()
+	_flow.best_of = _settings.best_of
 	_build_world()
 	_input_router = InputRouter.new()
-	_start_match()
-	if not _shot_path.is_empty():
+	_apply_settings()
+
+	if _shot_path.is_empty():
+		if _capture_path.is_empty():
+			_start_match()
+			_show_title()
+		else:
+			_setup_capture()
+	else:
+		# A capture must be real gameplay, so skip menus and let the AI play both.
+		_flow.begin_series(AppFlow.MODE_1P)
+		_start_match()
 		_fast_forward_for_shot()
 
 
@@ -123,9 +156,46 @@ func _build_world() -> void:
 	_hud.setup(PLAYER_COUNT)
 	add_child(_hud)
 
+	_title = TitleScreen.new()
+	_title.name = "TitleScreen"
+	add_child(_title)
+	_title.mode_selected.connect(_on_mode_selected)
+	_title.settings_requested.connect(_open_settings)
+	_title.quit_requested.connect(_on_quit)
+
+	_pause_menu = PauseMenu.new()
+	_pause_menu.name = "PauseMenu"
+	add_child(_pause_menu)
+	_pause_menu.resume_requested.connect(func() -> void: _set_paused(false))
+	_pause_menu.restart_requested.connect(_on_restart_round)
+	_pause_menu.quit_requested.connect(_to_title)
+
+	_series = SeriesPanel.new()
+	_series.name = "SeriesPanel"
+	add_child(_series)
+	_series.advance_requested.connect(_on_series_advance)
+	_series.change_mode_requested.connect(_to_title)
+	_series.quit_requested.connect(_on_quit)
+
+	_settings_screen = SettingsScreen.new()
+	_settings_screen.name = "SettingsScreen"
+	add_child(_settings_screen)
+	_settings_screen.values_changed.connect(_on_settings_changed)
+	_settings_screen.closed.connect(_on_settings_closed)
+
+	_audio = AudioDirector.new()
+	_audio.name = "Audio"
+	add_child(_audio)
+	# Captures must stay silent and deterministic; headless runs have no audio
+	# device and playing would leave a dangling playback at exit.
+	_audio.muted = not _shot_path.is_empty() or DisplayServer.get_name() == "headless"
+
 
 func _start_match() -> void:
 	_paused = false
+	_pause_menu.close()
+	_series.close()
+	_round_recorded = false
 	_accum = 0.0
 	_player_views.clear()
 	_bomb_views.clear()
@@ -155,11 +225,19 @@ func _start_match() -> void:
 		_entity_root.add_child(view)
 		_player_views[player.id] = view
 
-	if _mode == Mode.ONE_PLAYER or not _shot_path.is_empty():
+	_ensure_ai()
+	_hud.visible = _flow.screen == AppFlow.Screen.MATCH
+	_update_views(0.0)
+
+
+## AI participants depend on what is on screen: attract demo and shot mode play
+## themselves, 1P uses a CPU opponent, 2P is two humans.
+func _ensure_ai() -> void:
+	if not _shot_path.is_empty() or _flow.screen == AppFlow.Screen.TITLE:
 		for i in PLAYER_COUNT:
 			_ai[i] = SimpleAi.new(seed_value + 31 * (i + 1))
-
-	_update_views(0.0)
+	elif _flow.mode == AppFlow.MODE_1P:
+		_ai[1] = SimpleAi.new(seed_value + 62)
 
 
 func _physics_process(delta: float) -> void:
@@ -182,11 +260,16 @@ func _process(delta: float) -> void:
 	if sim == null:
 		return
 	_update_views(delta)
+	if _hud.visible:
+		_hud.update_from_sim(sim, _mode_name())
 	_maybe_capture_shot()
+	_maybe_capture_frame()
 
 
 func _tick() -> void:
-	var humans := PLAYER_COUNT if _mode == Mode.TWO_PLAYER and _shot_path.is_empty() else 1
+	var humans := 0
+	if _flow.screen == AppFlow.Screen.MATCH and _shot_path.is_empty():
+		humans = PLAYER_COUNT if _flow.mode == AppFlow.MODE_2P else 1
 	for i in humans:
 		var command: Dictionary = _input_router.read_player(i)
 		sim.submit_command(i, command["dir"], command["bomb"])
@@ -198,8 +281,14 @@ func _tick() -> void:
 	sim.step()
 	_handle_events(sim.take_events())
 
+	# The title screen runs an endless attract match so the backdrop is always live.
+	if _flow.screen == AppFlow.Screen.TITLE and sim.phase == MatchSim.Phase.IDLE:
+		_start_match()
+
 
 func _handle_events(events: Array) -> void:
+	if _audio != null:
+		_audio.handle_events(events)
 	var crates_changed := false
 	for event in events:
 		match event.type:
@@ -209,8 +298,131 @@ func _handle_events(events: Array) -> void:
 				_camera.kick(1.4)
 			SimEvent.Type.CRATE_DESTROYED:
 				crates_changed = true
+			SimEvent.Type.MATCH_ENDED:
+				if _flow.screen == AppFlow.Screen.MATCH and _shot_path.is_empty():
+					_finish_round(int(event.data.winner_id))
 	if crates_changed:
 		_arena_view.refresh_crates(sim.grid)
+
+
+# --- menu flow ----------------------------------------------------------------
+
+func _show_title() -> void:
+	_title.open()
+	_hud.visible = false
+
+
+func _on_mode_selected(mode: int) -> void:
+	_flow.begin_series(mode)
+	_title.close()
+	_start_match()
+
+
+func _on_series_advance() -> void:
+	if _flow.series_over:
+		_flow.begin_series(_flow.mode)
+	else:
+		_flow.next_round()
+	_start_match()
+
+
+# --- settings -----------------------------------------------------------------
+
+func _unhandled_input(event: InputEvent) -> void:
+	# ESC should back out of the settings screen without needing to find BACK.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_ESCAPE and _settings_screen != null and _settings_screen.visible:
+			_on_settings_closed()
+			get_viewport().set_input_as_handled()
+
+
+func _open_settings() -> void:
+	_title.close()
+	_settings_screen.open_with(_settings)
+
+
+func _on_settings_closed() -> void:
+	_settings_screen.close()
+	_settings.save_settings()
+	_show_title()
+
+
+func _on_settings_changed() -> void:
+	# Live-apply so volume/fullscreen feedback is immediate; persist on close.
+	_settings.save_settings()
+	_apply_settings()
+
+
+func _apply_settings() -> void:
+	if _settings == null:
+		return
+	if _flow != null:
+		_flow.best_of = _settings.best_of
+	if _audio != null:
+		_audio.master = clampf(_settings.master_volume * _settings.sfx_volume, 0.0, 1.0)
+	# Headless runs have no display server; only touch the window when one exists.
+	if DisplayServer.get_name() != "headless":
+		var want_fullscreen: bool = _settings.fullscreen
+		var is_fullscreen: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+		if want_fullscreen != is_fullscreen:
+			DisplayServer.window_set_mode(
+				DisplayServer.WINDOW_MODE_FULLSCREEN if want_fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
+func _on_restart_round() -> void:
+	_start_match()
+
+
+func _to_title() -> void:
+	_flow.back_to_title()
+	_start_match()
+	_show_title()
+
+
+func _on_quit() -> void:
+	get_tree().quit()
+
+
+func _finish_round(winner_id: int) -> void:
+	if _round_recorded:
+		return
+	_round_recorded = true
+	_flow.record_round(winner_id)
+	_camera.kick(1.5)
+	_hud.visible = false
+	_series.open_with(_flow)
+
+
+func _set_paused(on: bool) -> void:
+	if _flow.screen != AppFlow.Screen.MATCH:
+		return
+	_paused = on
+	_hud.visible = not on
+	if on:
+		_pause_menu.open()
+	else:
+		_pause_menu.close()
+
+
+func _poll_global_input() -> void:
+	if _shot_path != "":
+		return
+	if _flow.screen != AppFlow.Screen.MATCH:
+		return
+
+	var globals: Dictionary = _input_router.poll_global()
+	if globals["toggle_pause"]:
+		_set_paused(not _paused)
+		return
+	if _paused:
+		return
+
+	if globals["restart"]:
+		_start_match()
+	elif globals["mode_1p"] and _flow.mode != AppFlow.MODE_1P:
+		_on_mode_selected(AppFlow.MODE_1P)
+	elif globals["mode_2p"] and _flow.mode != AppFlow.MODE_2P:
+		_on_mode_selected(AppFlow.MODE_2P)
 
 
 func _update_views(delta: float) -> void:
@@ -224,9 +436,6 @@ func _update_views(delta: float) -> void:
 	_sync_bombs(size, delta)
 	_sync_blasts(size, delta)
 	_sync_pickups(size, delta)
-
-	if _hud != null:
-		_hud.update_from_sim(sim, _mode_name(), _paused)
 
 
 func _sync_bombs(size: Vector2i, delta: float) -> void:
@@ -288,22 +497,8 @@ func _sync_pickups(size: Vector2i, delta: float) -> void:
 			_pickup_views.erase(tile)
 
 
-func _poll_global_input() -> void:
-	var globals: Dictionary = _input_router.poll_global()
-	if globals["toggle_pause"]:
-		_paused = not _paused
-	if globals["restart"]:
-		_start_match()
-	elif globals["mode_1p"] and _mode != Mode.ONE_PLAYER:
-		_mode = Mode.ONE_PLAYER
-		_start_match()
-	elif globals["mode_2p"] and _mode != Mode.TWO_PLAYER:
-		_mode = Mode.TWO_PLAYER
-		_start_match()
-
-
 func _mode_name() -> String:
-	return "1P vs CPU" if _mode == Mode.ONE_PLAYER else "2P LOCAL"
+	return "1P vs CPU" if _flow.mode == AppFlow.MODE_1P else "2P LOCAL"
 
 
 func _parse_args() -> void:
@@ -314,6 +509,48 @@ func _parse_args() -> void:
 			_shot_ticks = int(arg.trim_prefix("--shot-ticks="))
 		elif arg.begins_with("--seed="):
 			seed_value = int(arg.trim_prefix("--seed="))
+		elif arg.begins_with("--capture="):
+			_capture_path = arg.trim_prefix("--capture=")
+		elif arg.begins_with("--capture-screen="):
+			_capture_screen = arg.trim_prefix("--capture-screen=")
+		elif arg.begins_with("--capture-after="):
+			_capture_after = int(arg.trim_prefix("--capture-after="))
+
+
+## Debug-only: bring a specific menu on screen so it can be captured for review.
+func _setup_capture() -> void:
+	match _capture_screen:
+		"pause":
+			_flow.begin_series(AppFlow.MODE_1P)
+			_start_match()
+			_set_paused(true)
+		"series":
+			_flow.begin_series(AppFlow.MODE_1P)
+			_start_match()
+			_flow.record_round(0)
+			_hud.visible = false
+			_series.open_with(_flow)
+		"settings":
+			_start_match()
+			_hud.visible = false
+			_settings_screen.open_with(_settings)
+		_:
+			_start_match()
+			_show_title()
+
+
+func _maybe_capture_frame() -> void:
+	if _capture_path.is_empty() or _capture_done:
+		return
+	_capture_frames += 1
+	if _capture_frames < _capture_after:
+		return
+	_capture_done = true
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var err := image.save_png(_capture_path)
+	print("capture saved: %s (err=%d, screen=%s)" % [_capture_path, err, _capture_screen])
+	get_tree().quit(0 if err == OK else 1)
 
 
 func _fast_forward_for_shot() -> void:

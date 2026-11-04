@@ -9,7 +9,6 @@ var _timer: Label
 var _phase: Label
 var _banner: Label
 var _hint: Label
-var _pause: Label
 var _panels: Array = []
 
 
@@ -48,16 +47,6 @@ func setup(player_count: int) -> void:
 	_banner.offset_bottom = 60
 	_banner.visible = false
 
-	_pause = _label(root, 44, Color(0.98, 0.86, 0.55))
-	_pause.text = "PAUSED\nEsc to resume"
-	_pause.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pause.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE, 0)
-	_pause.offset_left = -260
-	_pause.offset_right = 260
-	_pause.offset_top = -70
-	_pause.offset_bottom = 70
-	_pause.visible = false
-
 	_hint = _label(root, 19, Color(0.72, 0.79, 0.88))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.text = "P1 WASD + Space    P2 Arrows + Enter    R restart    1 / 2 mode    Esc pause"
@@ -68,7 +57,7 @@ func setup(player_count: int) -> void:
 	_hint.offset_bottom = -8
 
 
-func update_from_sim(sim, mode: String, paused: bool) -> void:
+func update_from_sim(sim, mode: String) -> void:
 	var clock: int = sim.rules.match_ticks if sim.phase == MatchSim.Phase.COUNTDOWN else sim.match_ticks_left
 	var seconds := maxi(clock, 0) / 60
 	_timer.text = "%d:%02d" % [seconds / 60, seconds % 60]
@@ -80,7 +69,6 @@ func update_from_sim(sim, mode: String, paused: bool) -> void:
 	for i in _panels.size():
 		_update_panel(i, sim)
 
-	_pause.visible = paused
 	_banner.visible = false
 	var countdown := ""
 	if sim.phase == MatchSim.Phase.COUNTDOWN:

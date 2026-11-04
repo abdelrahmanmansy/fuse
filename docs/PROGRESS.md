@@ -4,18 +4,119 @@ Updated: 2026-11-04
 Environment: Windows 11 · Godot 4.7.2 stable · Python 3.12 · Node 24 · Git
 Project: `C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse`
 
-**Status: M1 complete (verified). A grey-box local match is playable end to end.
-No audio, menus, or art assets exist yet.**
+**Status: M2 complete (verified). The game boots into a real front end and plays a
+best-of series with local 1P/2P, pause, settings and procedural SFX. Character art,
+music and Arabic localization do not exist yet.**
 
 | Milestone | State |
 | --- | --- |
 | M0 foundation | ✅ complete, committed `f9742e7` |
-| M1 grey-box playable | ✅ complete, verified (tests, self-play, captured frame) |
-| M2 local versus polish | ⬜ next |
-| M3 vertical slice | ⬜ not started |
+| M1 grey-box playable | ✅ complete, committed `4979242` |
+| M2 local versus front end | ✅ complete, verified (55 tests, 47 UI checks, 4 captures) |
+| M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
 | M6 release | ⬜ not started |
+
+---
+
+## M2 — local versus front end (verified)
+
+### What a player can do
+
+- Boot to a **title screen** with a live AI-vs-AI attract match running behind it.
+- Choose **LOCAL VERSUS** (2 players) or **SOLO** (1 player vs CPU).
+- Play a **best-of series** (default best of 3; 1 or 5 selectable) with a between-round
+  results card, next round, rematch and quit to title.
+- **Pause** mid-match and resume, restart the round, or leave to title.
+- Open **SETTINGS** from the title: master volume, SFX volume, series length,
+  fullscreen. Values apply immediately and persist across launches.
+- Hear **procedural SFX** for bomb placement, crate breaks, explosions, pickups, hits
+  and match wins.
+
+### New modules
+
+| File | Responsibility |
+| --- | --- |
+| `src/app/app_flow.gd` | Pure screen/series state machine (TITLE/MATCH/RESULTS), best-of scoring, draws and round limits. No nodes or input, so it is unit-tested headlessly. |
+| `src/app/settings.gd` | Persisted settings (`user://settings.json`) with a sanitising loader: defaults for missing keys, volume clamping, whitelisted series lengths/locales, corrupt JSON discarded. |
+| `src/audio/sfx_library.gd` | Runtime PCM synthesis (noise bursts, FM-ish tones, envelopes) for six sounds. Deterministic, zero binary assets. |
+| `src/audio/audio_director.gd` | `SimEvent` → sound mapping with a 16-voice pool, master gain and mute. Knows nothing about rules. |
+| `src/ui/ui_kit.gd` | Shared menu styling: palette, outlined labels, button focus ring, panels. |
+| `src/ui/screens/menu_panel.gd` | Full-screen menu base (dim backdrop, centred column, footer, recursive first-focus). |
+| `src/ui/screens/title_screen.gd` | Brand block and mode/settings/quit actions. |
+| `src/ui/screens/pause_menu.gd` | Resume / restart round / quit to title. |
+| `src/ui/screens/series_panel.gd` | Round result, running score, series winner, next action. |
+| `src/ui/screens/settings_screen.gd` | Volume sliders with a visible gold focus frame, series cycler, fullscreen toggle, back. |
+| `tools/ui_flow_test.gd` | Real-scene end-to-end menu test driven by synthesized key events. |
+
+`src/app/main.gd` now owns the flow: it loads settings before building the world, runs
+the attract match on the title, records real `MATCH_ENDED` events into the series,
+feeds every `SimEvent` to the audio director, applies volume/fullscreen changes, and
+mutes audio during automation.
+
+### Captured evidence
+
+All frames come from the real renderer at 1600×900.
+
+| Capture | What the pixels show |
+| --- | --- |
+| `docs/screenshots/m2-title.png` | Centred title block over a dimmed attract match; mean luminance 17.6; four stacked actions. |
+| `docs/screenshots/m2-settings.png` | Settings card with cyan border; the focused master-volume row draws a **gold frame at (526,324)–(1074,368)**; label rows and footer text present. |
+| `docs/screenshots/m2-pause.png` | Gold `PAUSED` heading and action buttons (1053 gold samples, centroid `(798,383)`). |
+| `docs/screenshots/m2-series.png` | Cyan results panel (`893` cyan samples, centroid `(762,301)`), round/score text and the next action. |
+
+### Verification evidence
+
+Headless test suite (new `test_app_flow.gd`, `test_settings.gd`, `test_sfx.gd`):
+
+```
+55 test(s), 313 assertion(s), 0 failure(s) in 464 ms
+PASS
+EXIT=0
+```
+
+End-to-end UI flow (`tools/ui_flow_test.gd`, synthesized key events, real AI rounds):
+
+```
+UI flow: 47 check(s)
+PASS
+EXIT=0
+```
+
+It verifies, in order: boot to title, open SETTINGS from the keyboard, raise a volume
+with `Right`, confirm the audio director gain follows, cycle the series length with
+`Enter`, confirm the flow adopts it, close settings with BACK, reopen it and close with
+`ESC`, start a 1P match, pause and resume, play a genuine AI-decided round to `RESULTS`,
+advance to round 2, reach a decided 2-0 series, rematch with a cleared score, and quit to
+title.
+
+Boot smoke (real scene, 300 frames):
+
+```
+EXIT=0
+```
+
+No `SCRIPT ERROR`, parse error or leaked-object warning in the log.
+
+### Bugs found and fixed during M2
+
+1. **Settings sanitizer crashed on a partial file.** `{"best_of": 5.0}` made the loader
+   read `raw["fullscreen"]` directly after `get()` returned a default, aborting
+   `_sanitize()` and returning an empty dictionary. Now the value is read once and
+   type-checked. Regression: `test_integral_float_series_is_accepted`.
+2. **Corrupt JSON printed a GDScript error.** Switched from `JSON.parse_string()` to a
+   `JSON` instance and its error return, so a bad settings file fails quietly.
+3. **Audio playback leaked at exit in headless runs.** Headless now mutes the director
+   from boot, so no `AudioStreamPlaybackWAV` is left dangling.
+4. **Sliders had no visible keyboard focus.** Volume rows are wrapped in a panel whose
+   border turns gold while the slider is focused; captures confirm the frame.
+5. **Settings changed the series length mid-test.** The UI test normalized back to
+   best-of-3 before the match assertions so the run stays deterministic.
+6. **Packed-array fade was applied to a copy.** `_fade()` now returns the buffer and
+   callers assign it; SFX tails actually fade.
+7. **`_focus_first()` only looked at direct children**, so the settings card would not
+   take focus. It now recurses into containers.
 
 ---
 
@@ -35,7 +136,7 @@ No audio, menus, or art assets exist yet.**
 
 | File | Responsibility |
 | --- | --- |
-| `src/app/main.gd` | Fixed-tick driver (60 Hz, max 4 catch-up steps), world environment, key/fill lights, camera wiring, event → camera shake, shot mode. |
+| `src/app/main.gd` | Fixed-tick driver (60 Hz, max 4 catch-up steps), world environment, key/fill lights, camera wiring, event → camera shake, shot/capture modes. |
 | `src/render/arena_style.gd` | Single source of truth for palette, player colours, tile→world conversion (tile size 2.0), materials. |
 | `src/render/arena_view.gd` | `MultiMeshInstance3D` floor/wall/crate build; incremental crate refresh on `CRATE_DESTROYED`. |
 | `src/render/player_view.gd` | Capsule body, facing visor with smoothed yaw, walk bob, start-of-step squash, spawn-guard shimmer, elimination flatten/fade. Driven by fixed-point `visual_position()`. |
@@ -43,16 +144,16 @@ No audio, menus, or art assets exist yet.**
 | `src/render/blast_view.gd` | Per-tile fire column with rise/fall driven by blast age. |
 | `src/render/pickup_view.gd` | Floating, spinning icon per pickup type, colour-coded. |
 | `src/render/camera_rig.gd` | Auto-fit orthographic-ish perspective camera at 56° elevation, fov 50, followed by decaying shake. |
-| `src/ui/hud.gd` | Phase banner (`READY`/countdown/`GO!`/winner/`DRAW`), match clock, per-player stat panels, controls hint, pause overlay. |
+| `src/ui/hud.gd` | Phase banner (`READY`/countdown/`GO!`/winner/`DRAW`), match clock, per-player stat panels, controls hint. |
 | `src/input/input_router.gd` | Keyboard + gamepad → `{dir, bomb}`; edge-detects bomb/pause/restart/mode keys. |
 | `src/ai/simple_ai.gd` | Deterministic opponent: danger map of armed bombs **and burning blast tiles**, time-aware escape BFS, plant only when a safe route exists after the new bomb, crate/enemy objectives, seeded roaming. |
 
 Design rule kept intact: views read simulation state and never write it; the simulation
 still has no node, input, audio or clock access (guard script enforces this).
 
-### Verification evidence
+### Verification evidence (M1)
 
-Headless suite:
+Headless suite at the time:
 
 ```
 37 test(s), 201 assertion(s), 0 failure(s) in 509 ms
@@ -77,8 +178,7 @@ PASS
 EXIT=0
 ```
 
-Captured frame, `docs/screenshots/m1-gameplay.png` (from shot mode, seed 4242,
-1600×900, `--shot-ticks=360`):
+Captured frame `docs/screenshots/m1-gameplay.png` (seed 4242, `--shot-ticks=360`):
 
 ```
 shot state: tick=362 phase=2 bombs=1 blasts=6 pickups=1 eliminations=0
@@ -89,10 +189,8 @@ shot state: tick=362 phase=2 bombs=1 blasts=6 pickups=1 eliminations=0
 shot saved: ...\m1-final2.png (err=0)
 ```
 
-Independent pixel checks on that PNG: cyan P1 body at `(508,237)` = `R94 G226 B255`,
-coral P2 body at `(1069,237)` = `R255 G143 B127`, HUD text present, mean luminance
-61.0 (up from 56.4 before the palette/lighting pass). Both fighters and live fire are
-therefore confirmed in the actual rendered image, not just in simulation state.
+Independent pixel checks: cyan P1 body at `(508,237)` = `R94 G226 B255`, coral P2 body
+at `(1069,237)` = `R255 G143 B127`, HUD text present, mean luminance 61.0.
 
 ### Bugs found and fixed during M1
 
@@ -203,14 +301,15 @@ Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 
 ## Not implemented (do not assume otherwise)
 
-- No audio at all (music, SFX, mix).
-- No menus, lobby, settings, pause menu beyond the overlay, or gamepad rebinding UI.
 - No character models, textures, rigs, animation clips or VFX sprites — all geometry is
   grey-box primitives built from code. No `.glb`/`.blend` assets exist.
+- No music, mixing bus, ambience or voice. SFX are synthesized placeholders.
+- No Arabic localization. The settings model already carries a `locale` field, but there
+  are no string tables and Godot's default font has no Arabic coverage, so a bundled
+  Arabic-capable font is required before those screens exist.
 - No adventure content, world map, bosses or progression.
 - No online play: no ENet transport, prediction, reconciliation, matchmaking or server.
-- No Android build/export, no localization files yet (AR/EN planned from M2 onward).
-- No save system, unlocks, or profiles.
+- No Android build/export, controller rebinding UI, or save profiles/unlocks.
 
 ## Known issues / watch items
 
@@ -221,20 +320,20 @@ Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 4. `blast-arena/` (earlier web prototype) is untouched and remains a rules/netcode reference.
 5. Running the Godot console binary in the foreground from some shells can stall on this
    machine; capturing output to a file or running it in the background works reliably.
-6. The grey-box frame means luminance 61.0 and reads dark on some displays; the final
-   art pass in M3 replaces palette and lighting anyway.
+6. Settings persistence writes `user://settings.json`; tests redirect to
+   `user://settings_test.json` / `user://settings_uitest.json` and clean up.
 7. The AI is a fairness-neutral test opponent, not a designed difficulty curve.
 
 ---
 
-## Next: M2 — local versus
+## Next: M3 — vertical slice
 
-1. Replace the instant-boot shell with a real front end: title → mode select (1P/2P) →
-   arena/character pick → match → rematch. Keyboard and gamepad navigation.
-2. Round/series scoring (best-of-N), per-player win tally, rematch flow on results.
-3. Pause menu (resume, restart, quit to menu) instead of the current overlay only.
-4. Settings screen: volume stubs, screen mode, input display; persist to `user://`.
-5. Basic SFX layer wired to `SimEvent`s (place, explode, pickup, hit, win) with
-   placeholder audio files.
-6. Expand the test suite to cover mode/scene transitions and settings persistence.
-7. Add Arabic + English string tables for all UI added in M2.
+1. Pick a theme and produce a first real art direction pass (characters, bombs, arena
+   tiles, UI frames) with Blender → glTF; keep the grey-box views as a fallback path.
+2. Replace runtime-synth SFX with designed audio and add one music loop plus a mixer.
+3. Character select with per-character stats/specials (rules-driven, tested headlessly).
+4. Arabic + English string tables and a bundled Arabic-capable font, starting with the
+   menu/HUD text added in M2.
+5. Menu polish: transitions, animated focus, input glyph swapping (keyboard vs pad).
+6. Expand tests: settings UI edge cases, series with changing best-of, audio voice-pool
+   exhaustion.
