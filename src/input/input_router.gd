@@ -43,13 +43,20 @@ var _mode1_latch := false
 var _mode2_latch := false
 var _suspended := false
 
+# Touch controls feed player 0 directly. They are merged with keyboard/pad input
+# so the same simulation path is used on desktop and mobile.
+var _virtual_dir := Vector2i.ZERO
+var _virtual_bomb_latch := false
+
 
 func read_player(index: int) -> Dictionary:
 	if _suspended:
 		return {"dir": Vector2i.ZERO, "bomb": false}
 	var keys: Dictionary = P1_KEYS if index == 0 else P2_KEYS
 	var dir := Vector2i.ZERO
-	if Input.is_physical_key_pressed(keys["left"]):
+	if index == 0 and _virtual_dir != Vector2i.ZERO:
+		dir = _virtual_dir
+	elif Input.is_physical_key_pressed(keys["left"]):
 		dir = Dirs.LEFT
 	elif Input.is_physical_key_pressed(keys["right"]):
 		dir = Dirs.RIGHT
@@ -59,6 +66,9 @@ func read_player(index: int) -> Dictionary:
 		dir = Dirs.DOWN
 
 	var bomb := Input.is_physical_key_pressed(keys["bomb"])
+	var virtual_bomb := index == 0 and _virtual_bomb_latch
+	if index == 0:
+		_virtual_bomb_latch = false
 
 	var pad := _pad_dir(index)
 	if pad != Vector2i.ZERO:
@@ -68,12 +78,22 @@ func read_player(index: int) -> Dictionary:
 		if _joy_bomb(device):
 			bomb = true
 
-	var pressed: bool = bomb and not bool(_prev_bomb[index])
+	var pressed: bool = (bomb and not bool(_prev_bomb[index])) or virtual_bomb
 	_prev_bomb[index] = bomb
 	if _bomb_latch[index]:
 		pressed = true
 		_bomb_latch[index] = false
 	return {"dir": dir, "bomb": pressed}
+
+
+## On-screen d-pad. Keeping it in the router (instead of injecting fake keys)
+## means touch, keyboard and gamepad all reach the simulation through one path.
+func set_virtual_dir(dir: Vector2i) -> void:
+	_virtual_dir = dir
+
+
+func trigger_virtual_bomb() -> void:
+	_virtual_bomb_latch = true
 
 
 func poll_global() -> Dictionary:
@@ -131,8 +151,8 @@ func handle_event(event: InputEvent) -> void:
 				_bomb_latch[index] = true
 
 
-## Drop queued presses without touching held state (pausing must not bank a
-## bomb that fires on resume).
+## Drop queued presses and any held touch direction (pausing must not bank a
+## bomb or keep the player walking on resume).
 func clear_latches() -> void:
 	for i in _bomb_latch.size():
 		_bomb_latch[i] = false
@@ -140,6 +160,8 @@ func clear_latches() -> void:
 	_restart_latch = false
 	_mode1_latch = false
 	_mode2_latch = false
+	_virtual_bomb_latch = false
+	_virtual_dir = Vector2i.ZERO
 
 
 ## Window lost focus: stop reading devices and forget queued presses. Godot does

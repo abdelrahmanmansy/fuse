@@ -10,7 +10,8 @@ SFX, and the arena now reads like classic Bomberman (grass checkerboard, brick p
 wooden crates, white-suited fighters, glossy bombs, layered fire). The **21×13 arena
 fills the 16:9 frame** and its **dense crate field outnumbers the permanent pillars**.
 Character art is still code-built primitives; no music, no external models/textures.
-Touch controls are wired into the input router but not yet shown on a build.**
+Touch controls are wired into the input router and unit-tested, but not yet shown on a
+build.**
 
 | Milestone | State |
 | --- | --- |
@@ -19,7 +20,7 @@ Touch controls are wired into the input router but not yet shown on a build.**
 | M2 local versus front end | ✅ complete, committed `ee511a0` |
 | M2.5 localization + classic art pass | ✅ complete, committed `162e633` |
 | M2.6 input & feel pass | ✅ complete, committed `812d707` |
-| M2.7 full-screen arena + crate density | ✅ complete, verified (74 tests, 534 assertions) |
+| M2.7 full-screen arena + crate density | ✅ complete, verified (77 tests, 540 assertions) |
 | M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
@@ -45,7 +46,7 @@ Touch controls are wired into the input router but not yet shown on a build.**
 ### Verification evidence
 
 ```
-74 test(s), 534 assertion(s), 0 failure(s)
+77 test(s), 540 assertion(s), 0 failure(s)
 PASS                                   (EXIT=0)
 UI flow: 56 check(s)                   (EXIT=0)
 AI self-play: ticks=4387 phase=4 winner=0
@@ -54,6 +55,9 @@ PASS                                   (EXIT=0)
 boot smoke, 180 frames                 (EXIT=0, no SCRIPT ERROR)
 core boundary check passed (11 file(s))     (EXIT=0)
 ```
+
+The three extra tests over the arena commit cover the touch input path (virtual direction,
+one-shot virtual bomb, and clearing virtual state on pause).
 
 Golden hashes were regenerated for the new arena dimensions/density:
 
@@ -75,6 +79,16 @@ cap stopped just before the CPU could win.
 - Self-play remains seed-sensitive at 82 % density: the official seed resolves, but some
   seeds stalemate or end early. Arena balance tooling (`tools/arena_balance.gd`) is kept
   for future tuning.
+
+### Mobile groundwork (not yet on a build)
+
+- `InputRouter` gained `set_virtual_dir()` and `trigger_virtual_bomb()`. Touch input now
+  enters the same command path as keyboard and gamepad, including the 100 ms bomb buffer.
+- `src/ui/touch_controls.gd` builds an on-screen d-pad, BOMB and PAUSE overlay in the
+  project's UI style, with EN/AR labels and automatic release on hide.
+- Three unit tests cover virtual direction, one-shot virtual bombs, and clearing virtual
+  state when pausing. The overlay is **not attached to `main.gd` yet**, so no shipped build
+  shows touch buttons until the web export milestone.
 
 ---
 

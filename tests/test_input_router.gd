@@ -70,3 +70,29 @@ func test_suspended_router_ignores_input_until_resume() -> void:
 	router.resume()
 	check(not router.read_player(0)["bomb"], "resuming does not replay a press")
 
+
+func test_virtual_direction_drives_player_one_only() -> void:
+	var router = InputRouter.new()
+	router.set_virtual_dir(Vector2i(1, 0))
+
+	eq(router.read_player(0)["dir"], Vector2i(1, 0), "touch d-pad steers P1")
+	eq(router.read_player(1)["dir"], Vector2i.ZERO, "touch d-pad does not steer P2")
+
+
+func test_virtual_bomb_is_consumed_once() -> void:
+	var router = InputRouter.new()
+	router.trigger_virtual_bomb()
+
+	check(router.read_player(0)["bomb"], "touch bomb is delivered")
+	check(not router.read_player(0)["bomb"], "touch bomb is consumed once")
+
+
+func test_clear_latches_clears_virtual_touch_state() -> void:
+	var router = InputRouter.new()
+	router.set_virtual_dir(Vector2i(1, 0))
+	router.trigger_virtual_bomb()
+	router.clear_latches()
+
+	eq(router.read_player(0)["dir"], Vector2i.ZERO, "pause drops a held touch direction")
+	check(not router.read_player(0)["bomb"], "pause drops a queued touch bomb")
+
