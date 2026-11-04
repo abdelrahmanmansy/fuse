@@ -8,7 +8,9 @@ extends Camera3D
 const Style = preload("res://src/render/arena_style.gd")
 
 const ELEVATION_DEG := 68.0
-const FIT_MARGIN := 0.90
+## 1.0 fits the board edge-to-edge; the old 0.90 left a visible dark frame around
+## the arena on a 16:9 display.
+const FIT_MARGIN := 1.0
 
 var _base_position: Vector3 = Vector3(0, 25, 17)
 var _shake: float = 0.0

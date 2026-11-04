@@ -23,7 +23,8 @@ func _initialize() -> void:
 	var rules = Ruleset.new()
 	rules.countdown_ticks = 0
 	var arena = ArenaLayout.new()
-	if not arena.generate(15, 13, seed_value, 4):
+	if not arena.generate(rules.arena_width, rules.arena_height, seed_value, 4,
+			rules.crate_density_percent):
 		printerr("arena generation failed: %s" % arena.last_error)
 		quit(1)
 		return

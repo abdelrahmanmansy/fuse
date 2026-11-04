@@ -170,10 +170,12 @@ func _run() -> void:
 
 
 ## Fast-forward the live match with the real AI/event pipeline until RESULTS.
-## Returns the winner id, or -1 if the round did not finish.
+## Returns the winner id, or -1 if the round did not finish. The cap covers the
+## full match timer plus sudden death; an idle human is only cornered after the
+## countdown, so a 9000-tick cap would stop right as sudden death begins.
 func _play_round() -> int:
 	var ticks := 0
-	while _main.sim.phase != MatchSim.Phase.RESULTS and ticks < 9000:
+	while _main.sim.phase != MatchSim.Phase.RESULTS and ticks < 15000:
 		_main._shot_step()
 		ticks += 1
 	if _main.sim.phase != MatchSim.Phase.RESULTS:

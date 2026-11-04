@@ -4,11 +4,13 @@ Updated: 2026-11-04
 Environment: Windows 11 · Godot 4.7.2 stable · Python 3.12 · Node 24 · Git
 Project: `C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse`
 
-**Status: M2.5 complete (verified). The game boots into a localized front end (English +
+**Status: M2.7 complete (verified). The game boots into a localized front end (English +
 Arabic with RTL), plays a best-of series with local 1P/2P, pause, settings and procedural
 SFX, and the arena now reads like classic Bomberman (grass checkerboard, brick pillars,
-wooden crates, white-suited fighters, glossy bombs, layered fire). Character art is still
-code-built primitives; no music, no external models/textures.**
+wooden crates, white-suited fighters, glossy bombs, layered fire). The **21×13 arena
+fills the 16:9 frame** and its **dense crate field outnumbers the permanent pillars**.
+Character art is still code-built primitives; no music, no external models/textures.
+Touch controls are wired into the input router but not yet shown on a build.**
 
 | Milestone | State |
 | --- | --- |
@@ -16,11 +18,63 @@ code-built primitives; no music, no external models/textures.**
 | M1 grey-box playable | ✅ complete, committed `4979242` |
 | M2 local versus front end | ✅ complete, committed `ee511a0` |
 | M2.5 localization + classic art pass | ✅ complete, committed `162e633` |
-| M2.6 input & feel pass | ✅ complete, verified (74 tests, 525 assertions) |
+| M2.6 input & feel pass | ✅ complete, committed `812d707` |
+| M2.7 full-screen arena + crate density | ✅ complete, verified (74 tests, 534 assertions) |
 | M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
 | M6 release | ⬜ not started |
+
+---
+
+## M2.7 — full-screen arena + crate density (verified)
+
+### What changed for the player
+
+- **The board fills the screen.** The playfield widened from 15×13 to **21×13** and the
+  camera now frames it edge-to-edge (`FIT_MARGIN` 0.90 → 1.0). On a 1920×1080 capture the
+  arena occupies ~72 % of the width at the far edge, ~96 % at the near edge and ~97 % of
+  the height, instead of sitting inside a dark frame.
+- **Crates outnumber permanent rocks.** Crate density raised from 62 % to **82 %** of the
+  free interior. Seed 4242 at 21×13 produces **113 crates vs 58 interior pillars** (1.95:1);
+  the old 15×13 / 62 % board produced 72 vs 40. More cover means more routes to blast open
+  and fewer empty stone corridors.
+- **Classic pillar lattice kept.** Permanent rocks stay on the odd/odd lattice with the
+  3×3 spawn pocket, so the familiar two-tile lanes and safe openings remain.
+
+### Verification evidence
+
+```
+74 test(s), 534 assertion(s), 0 failure(s)
+PASS                                   (EXIT=0)
+UI flow: 56 check(s)                   (EXIT=0)
+AI self-play: ticks=4387 phase=4 winner=0
+  bombs=72 explosions=69 crates=90 pickups=24 eliminations=3 first_elim=396
+PASS                                   (EXIT=0)
+boot smoke, 180 frames                 (EXIT=0, no SCRIPT ERROR)
+core boundary check passed (11 file(s))     (EXIT=0)
+```
+
+Golden hashes were regenerated for the new arena dimensions/density:
+
+| Scenario | Hash |
+| --- | --- |
+| seed 4242, 600 ticks, scripted | `3624302480` |
+| seed 4242, 200 ticks, idle | `1871792400` |
+| seed 4242, 200 ticks, scripted | `4233387856` |
+
+The UI flow test now allows 15,000 ticks per round. A 1P round with an idle human only
+resolves after the match clock reaches sudden death (~9,400 ticks), so the old 9,000-tick
+cap stopped just before the CPU could win.
+
+### Tuning notes
+
+- The offset pillar lattice (even/even) and a 5×5 spawn pocket were both rejected: the
+  first made bots self-eliminate almost immediately, the second failed all tested
+  configurations at ~176 ticks. Odd/odd + a 3×3 pocket is the stable layout.
+- Self-play remains seed-sensitive at 82 % density: the official seed resolves, but some
+  seeds stalemate or end early. Arena balance tooling (`tools/arena_balance.gd`) is kept
+  for future tuning.
 
 ---
 
@@ -144,13 +198,13 @@ SMOKE_EXIT=0 · SELFPLAY_EXIT=0 · BOUNDARY_EXIT=0
 New coverage: mid-tile reversal, reversal blocked by a bomb, bomb-press buffering and
 expiry, countdown buffering, and `tests/test_input_router.gd` for event latching
 (bomb/P2/global actions/clear/suspend). Golden hashes were intentionally regenerated for
-the new speed curve and buffered-bomb state:
+the new speed curve and buffered-bomb state, then again in M2.7 for the 21×13 / 82 % arena:
 
 | Scenario | Hash |
 | --- | --- |
-| seed 4242, 600 ticks, scripted | `3618636086` |
-| seed 4242, 200 ticks, idle | `3308826698` |
-| seed 4242, 200 ticks, scripted | `4227721462` |
+| seed 4242, 600 ticks, scripted | `3624302480` |
+| seed 4242, 200 ticks, idle | `1871792400` |
+| seed 4242, 200 ticks, scripted | `4233387856` |
 
 ---
 
@@ -259,7 +313,8 @@ No `SCRIPT ERROR`, parse error or leaked-object warning in the log.
 
 ### What a player can do
 
-- Launch the project and immediately play a full match on a generated 15×13 arena.
+- Launch the project and immediately play a full match on a generated arena (currently
+  21×13 with a dense crate field).
 - **1P vs CPU** (default) or **2P local** (`1` / `2` to switch modes).
 - Move in cardinal directions with buffered input, drop bombs, chain-detonate them,
   destroy crates, collect four pickup types (extra bomb, range, speed, kick).
@@ -424,13 +479,13 @@ Behavior contracts pinned by tests:
 ### 5. Golden hashes
 
 Locked in `tests/test_golden.gd` (regenerate with `tools/dump_golden_hash.gd` only when
-a simulation change is intentional; regenerated in M2.6 for the input/speed pass):
+a simulation change is intentional; last regenerated in M2.7 for the arena change):
 
 | Scenario | Hash |
 | --- | --- |
-| seed 4242, 600 ticks, scripted commands | `3618636086` |
-| seed 4242, 200 ticks, idle | `3308826698` |
-| seed 4242, 200 ticks, scripted | `4227721462` |
+| seed 4242, 600 ticks, scripted commands | `3624302480` |
+| seed 4242, 200 ticks, idle | `1871792400` |
+| seed 4242, 200 ticks, scripted | `4233387856` |
 
 Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 

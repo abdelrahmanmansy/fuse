@@ -3,15 +3,16 @@
 Working title for a modern **2.5D bomb-arena action game** (Atomic Bomberman-inspired),
 built in **Godot 4.7.2**. Windows first, Android after.
 
-> **Status: M2.6 — localized front end, classic art pass, input polish (verified).**
+> **Status: M2.7 — full-screen arena, classic art pass, input polish (verified).**
 > Title screen with a live AI attract match → mode select → best-of series → results →
 > rematch. Pause menu, persisted settings, and event-driven procedural sound effects are
 > in. **Arabic and English ship from day one**, with RTL layout and a bundled
-> Arabic-capable font. The arena now reads like classic Bomberman: grass checkerboard,
-> terracotta brick pillars, wooden crates, white-suited characters with coloured helmets,
-> glossy black bombs and layered fire. Movement reverses instantly, input presses are
-> latched per event and bombs are buffered for 100 ms. All art is still **code-built 3D
-> primitives and shaders** — no external models or textures, and no music yet.
+> Arabic-capable font. The arena now reads like classic Bomberman: a **21×13 board that
+> fills the 16:9 frame**, grass checkerboard, terracotta brick pillars, a dense crate
+> field, white-suited characters with coloured helmets, glossy black bombs and layered
+> fire. Movement reverses instantly, input presses are latched per event and bombs are
+> buffered for 100 ms. All art is still **code-built 3D primitives and shaders** — no
+> external models or textures, and no music yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for exactly what exists and what does not.
 
 ![Title screen](docs/screenshots/m2-title-en.png)
@@ -25,8 +26,8 @@ match.*
 
 ![Classic match](docs/screenshots/m2-gameplay-en.png)
 
-*Real captured frame from `--shot` mode, tick 1101: two fighters, an armed bomb, fire and
-pickups on the green checkerboard.*
+*Real captured frame from `--shot` mode, tick 779: two fighters, an armed bomb, fire and
+pickups on the green checkerboard of the 21×13 arena.*
 
 ---
 
@@ -153,7 +154,7 @@ $godot = "$env:LOCALAPPDATA\Programs\Godot\4.7.2\Godot_v4.7.2-stable_win64_conso
 & $godot --headless --path . --script res://tests/run_tests.gd
 ```
 
-Expected: `74 test(s), 525 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
+Expected: `74 test(s), 534 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
 Add `-- --verbose` to list each test by name.
 
 End-to-end menu test (real scene tree, synthesized key events, real AI matches to a

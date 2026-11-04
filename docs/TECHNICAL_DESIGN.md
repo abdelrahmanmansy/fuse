@@ -35,7 +35,7 @@ solo dev + AI agent, Windows + Android).
 | Candidate | Rendering fit | Character animation | Grid gameplay | Pads / local MP | Online path | Win + Android | Agent-friendliness | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Godot 4.7** | Strong with art direction; SSAO/SSIL, glow, fog, decals, GPU particles, shaders | Strong: glTF skeletal, AnimationTree blend trees/state machines, IK modifiers, blend shapes | Excellent — no engine friction | Excellent, per-device input | Good: build authoritative headless server | Excellent, one-click export | Excellent: text scenes/resources, headless CLI, small diffs | **Pick** |
-| Unreal 5 | Best raw fidelity (Lumen/Nanite) | Best-in-class (Control Rig, Sequencer) | Overkill | Good | Good (dedicated server) | Heavy; tens of GB, slow iteration | Poor: binary assets, C++/Blueprint, slow builds | Wrong cost/benefit for a 15×13 arena game |
+| Unreal 5 | Best raw fidelity (Lumen/Nanite) | Best-in-class (Control Rig, Sequencer) | Overkill | Good | Good (dedicated server) | Heavy; tens of GB, slow iteration | Poor: binary assets, C++/Blueprint, slow builds | Wrong cost/benefit for a small arena game |
 | Bevy (Rust) | Good | Weak–moderate: no editor, hand-built state machines, immature skinning workflow | Excellent ECS | Moderate | Weak | Moderate | Strong for code, weak for content/art iteration | High-risk research project |
 | Three.js / R3F | Moderate; stylized is achievable but lighting/animation tooling is manual | Weak: no skeletal pipeline, no blend trees | Excellent | Weak for native pads | Excellent (Colyseus proven) | Browser only (+ Capacitor wrapper) | Strong | Keep as web demo/reference, not the premium build |
 | Cocos Creator 3.8 | Good | Moderate | Good | Moderate | Moderate | Good (Android-first) | Moderate | Viable, no advantage over Godot |
@@ -150,7 +150,8 @@ fuse/
 
 ### 5.3 Gameplay model (M1 scope)
 
-- Grid: 15×13 default, configurable per arena; border walls, pillar lattice, crate field.
+- Grid: 21×13 default, configurable per arena; border walls, odd/odd pillar lattice,
+  dense crate field (82 % of free interior tiles).
 - Movement: tile-to-tile stepping with fixed-point interpolation, one-input buffer,
   corner assist. Crisp, deterministic, network-friendly. Not free 8-way physics.
 - Bomb: capacity, fuse, range, chain via tick-ordered propagation queue.

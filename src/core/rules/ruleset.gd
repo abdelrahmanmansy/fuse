@@ -7,7 +7,7 @@ const TICK_RATE := 60
 const FIXED_ONE := 1024
 
 # Arena / match flow
-var arena_width: int = 15
+var arena_width: int = 21
 var arena_height: int = 13
 var countdown_ticks: int = 180          # 3.0 s
 var match_ticks: int = 9000             # 150 s
@@ -40,7 +40,7 @@ var max_range: int = 6
 
 # Loot
 var drop_chance_percent: int = 34
-var crate_density_percent: int = 62
+var crate_density_percent: int = 82
 
 
 func speed_fp_for_level(level: int) -> int:

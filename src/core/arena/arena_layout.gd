@@ -8,6 +8,14 @@ extends RefCounted
 const Grid = preload("res://src/core/sim/grid.gd")
 const Rng = preload("res://src/core/sim/rng.gd")
 
+## Share of the free interior tiles that become crates. Classic arenas are dense
+## with breakable cover, so the board reads as a battlefield instead of a maze of
+## permanent pillars.
+const DEFAULT_CRATE_PERCENT := 82
+## Clear radius around each spawn. A 3x3 pocket keeps the opening safe without
+## handing the bots a wide-open arena that the current AI escapes poorly.
+const SPAWN_CLEAR_RADIUS := 1
+
 var grid
 var spawns: Array = []
 var theme: String = ""
@@ -65,10 +73,13 @@ func load_ascii(text: String) -> bool:
 	return true
 
 
-func generate(width: int, height: int, seed_value: int, spawn_count: int = 4) -> bool:
+func generate(width: int, height: int, seed_value: int, spawn_count: int = 4,
+		crate_percent: int = DEFAULT_CRATE_PERCENT) -> bool:
 	last_error = ""
 	if width < 7 or height < 5:
 		return _fail("generated arenas need at least 7x5 tiles")
+
+	var density := clampi(crate_percent, 0, 100)
 
 	grid.resize(width, height, Grid.Tile.WALL)
 	spawns.clear()
@@ -83,22 +94,24 @@ func generate(width: int, height: int, seed_value: int, spawn_count: int = 4) ->
 	for i in mini(spawn_count, corners.size()):
 		spawns.append(corners[i])
 
-	# Classic pillar lattice on odd coordinates, crates elsewhere.
+	# Classic pillar lattice on odd coordinates, crates elsewhere. The spawn
+	# corners are odd/odd, so their 3x3 pocket stays open and the board keeps the
+	# familiar two-tile lanes between permanent rocks.
 	for y in range(1, height - 1):
 		for x in range(1, width - 1):
 			if x % 2 == 1 and y % 2 == 1:
 				grid.set_tile(x, y, Grid.Tile.WALL)
 			elif _in_spawn_zone(Vector2i(x, y), spawns):
 				grid.set_tile(x, y, Grid.Tile.FLOOR)
-			elif rng.next_int(100) < 62:
+			elif rng.next_int(100) < density:
 				grid.set_tile(x, y, Grid.Tile.CRATE)
 			else:
 				grid.set_tile(x, y, Grid.Tile.FLOOR)
 
-	# Guarantee a clear 3x3 pocket around every spawn so no one starts trapped.
+	# Guarantee a clear pocket around every spawn so no one starts trapped.
 	for spawn in spawns:
-		for dy in range(-1, 2):
-			for dx in range(-1, 2):
+		for dy in range(-SPAWN_CLEAR_RADIUS, SPAWN_CLEAR_RADIUS + 1):
+			for dx in range(-SPAWN_CLEAR_RADIUS, SPAWN_CLEAR_RADIUS + 1):
 				var p: Vector2i = spawn + Vector2i(dx, dy)
 				if _is_interior(p, width, height):
 					grid.set_tile(p.x, p.y, Grid.Tile.FLOOR)
@@ -111,7 +124,7 @@ func spawn_for(player_index: int) -> Vector2i:
 
 func _in_spawn_zone(point: Vector2i, points: Array) -> bool:
 	for spawn in points:
-		if absi(point.x - spawn.x) <= 1 and absi(point.y - spawn.y) <= 1:
+		if absi(point.x - spawn.x) <= SPAWN_CLEAR_RADIUS and absi(point.y - spawn.y) <= SPAWN_CLEAR_RADIUS:
 			return true
 	return false
 

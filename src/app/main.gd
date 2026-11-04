@@ -228,7 +228,8 @@ func _start_match() -> void:
 
 	rules = Ruleset.new()
 	arena = ArenaLayout.new()
-	if not arena.generate(15, 13, seed_value, PLAYER_COUNT):
+	if not arena.generate(rules.arena_width, rules.arena_height, seed_value, PLAYER_COUNT,
+			rules.crate_density_percent):
 		push_error("arena generation failed: %s" % arena.last_error)
 		return
 
