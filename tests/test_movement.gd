@@ -44,6 +44,21 @@ func test_tap_is_buffered_for_exactly_one_tile() -> void:
 	eq(sim.players[0].move_progress, 0, "no leftover progress")
 
 
+func test_releasing_the_key_stops_at_the_next_tile_boundary() -> void:
+	var sim = _play()
+	for i in 25:
+		sim.submit_command(0, Dirs.RIGHT, false)
+		sim.step()
+	eq(sim.players[0].tile, Vector2i(2, 1), "already chaining into the second tile")
+
+	for i in 25:
+		sim.submit_command(0, Vector2i.ZERO, false)
+		sim.step()
+	eq(sim.players[0].tile, Vector2i(3, 1), "finishes the current tile, then stops")
+	check(not sim.players[0].moving, "no phantom buffered step after release")
+	eq(sim.players[0].move_progress, 0, "clean stop at the tile centre")
+
+
 func test_wall_blocks_movement() -> void:
 	var sim = _play(WALL_AHEAD)
 	for i in 40:

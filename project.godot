@@ -9,6 +9,7 @@ config_version=5
 config/name="FUSE"
 config/description="A modern 2.5D bomb-arena action game."
 config/features=PackedStringArray("4.7", "Forward Plus")
+run/main_scene="res://scenes/main.tscn"
 config/icon="res://icon.svg"
 
 [display]

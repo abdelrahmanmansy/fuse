@@ -59,6 +59,27 @@ func test_timer_transitions_to_sudden_death_and_drops_bombs() -> void:
 	eq(sim.bombs[0].owner_id, -1, "world-owned bomb")
 
 
+func test_blasts_fade_out_during_results() -> void:
+	var sim = Factory.build(DUEL)
+	sim.rules.results_ticks = 60
+	sim.rules.blast_ticks = 10
+	sim.rules.fuse_ticks = 5
+	check(Factory.to_playing(sim), "playing")
+	sim.players[0].blast_range = 2
+
+	sim.submit_command(0, Vector2i.ZERO, true)
+	sim.step()
+	for i in 4:
+		sim.step()
+	eq(sim.phase, MatchSim.Phase.RESULTS, "match ended")
+	check(not sim.blasts.is_empty(), "the killing blast exists on the results tick")
+
+	for i in 10:
+		sim.step()
+	check(sim.blasts.is_empty(), "blasts keep expiring during results")
+	eq(sim.phase, MatchSim.Phase.RESULTS, "still showing results")
+
+
 func test_results_phase_expires_back_to_idle() -> void:
 	var sim = Factory.build(DUEL)
 	sim.rules.results_ticks = 5

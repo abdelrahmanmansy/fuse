@@ -117,6 +117,9 @@ func step() -> void:
 		_step_active()
 	elif phase == Phase.RESULTS:
 		phase_ticks_left -= 1
+		# Let the final explosion fade instead of freezing mid-burn during the
+		# results screen; damage is already over because _step_active is not run.
+		_tick_blasts()
 		if phase_ticks_left <= 0:
 			phase = Phase.IDLE
 			_emit(SimEvent.Type.PHASE_CHANGED, {"phase": phase})
@@ -162,7 +165,11 @@ func _step_active() -> void:
 ## --- movement -----------------------------------------------------------------
 
 func _move_player(player, want: Vector2i) -> void:
-	if not Dirs.is_zero(want):
+	# A zero direction means "no input": drop any buffered intent so releasing a
+	# key stops the player at the next tile boundary instead of chaining on.
+	if Dirs.is_zero(want):
+		player.buffered_dir = Vector2i.ZERO
+	else:
 		player.buffered_dir = want
 
 	if not player.moving:
