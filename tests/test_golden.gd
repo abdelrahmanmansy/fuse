@@ -51,9 +51,9 @@ func test_commands_change_the_outcome() -> void:
 ## Locked values recorded with tools/dump_golden_hash.gd on Godot 4.7.2 (Windows).
 ## If a simulation change is intentional, re-run that tool and update the numbers.
 func test_golden_hashes_are_locked() -> void:
-	eq(_run(4242, 600, true), 3530677916, "600-tick scripted duel")
-	eq(_run(4242, 200, false), 1752669574, "200 idle ticks, seed 4242")
-	eq(_run(4242, 200, true), 4161587804, "200 scripted ticks, seed 4242")
+	eq(_run(4242, 600, true), 3618636086, "600-tick scripted duel")
+	eq(_run(4242, 200, false), 3308826698, "200 idle ticks, seed 4242")
+	eq(_run(4242, 200, true), 4227721462, "200 scripted ticks, seed 4242")
 
 
 func test_ten_thousand_ticks_without_a_scene_tree() -> void:

@@ -3,14 +3,15 @@
 Working title for a modern **2.5D bomb-arena action game** (Atomic Bomberman-inspired),
 built in **Godot 4.7.2**. Windows first, Android after.
 
-> **Status: M2.5 — localized front end + classic art pass (verified).**
+> **Status: M2.6 — localized front end, classic art pass, input polish (verified).**
 > Title screen with a live AI attract match → mode select → best-of series → results →
 > rematch. Pause menu, persisted settings, and event-driven procedural sound effects are
 > in. **Arabic and English ship from day one**, with RTL layout and a bundled
 > Arabic-capable font. The arena now reads like classic Bomberman: grass checkerboard,
 > terracotta brick pillars, wooden crates, white-suited characters with coloured helmets,
-> glossy black bombs and layered fire. All art is still **code-built 3D primitives and
-> shaders** — no external models or textures, and no music yet.
+> glossy black bombs and layered fire. Movement reverses instantly, input presses are
+> latched per event and bombs are buffered for 100 ms. All art is still **code-built 3D
+> primitives and shaders** — no external models or textures, and no music yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for exactly what exists and what does not.
 
 ![Title screen](docs/screenshots/m2-title-en.png)
@@ -94,6 +95,18 @@ Title actions: **LOCAL VERSUS** (2 players, one keyboard or two pads), **SOLO**
 A series is **best of 3** by default (1 or 5 selectable in settings). Draws award no
 point but consume a round, and the round limit closes a series that cannot be decided.
 
+### Feel and input
+
+- Base movement is **3.75 tiles/s** (16 ticks per tile), with five speed upgrades up to
+  ≈6.1 tiles/s.
+- Pressing the opposite direction **reverses in place** instead of finishing the tile
+  first; reversing into a bomb is refused.
+- Press edges are latched from the actual input event, so a quick tap is never lost
+  between simulation ticks.
+- A bomb press stays **buffered for 100 ms** and also carries from READY into GO, so
+  presses just before a slot frees still land.
+- Analog sticks use a 0.28 deadzone and follow the most-deflected axis.
+
 The CPU opponent reads the same public simulation state a client sees and issues
 ordinary move/bomb commands. It plans timed escape routes, so it will not walk along
 its own blast lane.
@@ -140,7 +153,7 @@ $godot = "$env:LOCALAPPDATA\Programs\Godot\4.7.2\Godot_v4.7.2-stable_win64_conso
 & $godot --headless --path . --script res://tests/run_tests.gd
 ```
 
-Expected: `63 test(s), 487 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
+Expected: `74 test(s), 525 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
 Add `-- --verbose` to list each test by name.
 
 End-to-end menu test (real scene tree, synthesized key events, real AI matches to a

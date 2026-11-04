@@ -90,3 +90,63 @@ func test_kick_power_slides_the_bomb_and_the_player_follows() -> void:
 	var kicked: bool = sim.take_events().any(func(event): return event.type == SimEvent.Type.BOMB_KICKED)
 	check(kicked, "BOMB_KICKED event emitted")
 	eq(sim.players[0].tile, Vector2i(2, 1), "player advanced into the freed lane")
+
+
+## Pressing bomb a few frames before a slot frees should still place it.
+func test_bomb_press_is_buffered_when_capacity_is_temporarily_full() -> void:
+	var sim = _play()
+	sim.rules.fuse_ticks = 999
+
+	sim.submit_command(0, Vector2i.ZERO, true)
+	sim.step()
+	eq(sim.bombs.size(), 1, "first bomb placed")
+
+	for i in 17:
+		sim.submit_command(0, Dirs.RIGHT, false)
+		sim.step()
+	eq(sim.players[0].tile, Vector2i(2, 1), "stepped off the bomb tile")
+
+	# Capacity is still 1, so this press cannot place yet.
+	sim.submit_command(0, Vector2i.ZERO, true)
+	sim.step()
+	eq(sim.bombs.size(), 1, "no room yet")
+
+	# Free a slot inside the buffer window: the queued press fires immediately.
+	sim.players[0].capacity = 2
+	sim.step()
+	eq(sim.bombs.size(), 2, "buffered press places as soon as capacity allows")
+
+
+func test_bomb_press_buffer_expires() -> void:
+	var sim = _play()
+	sim.rules.fuse_ticks = 999
+
+	sim.submit_command(0, Vector2i.ZERO, true)
+	sim.step()
+	for i in 17:
+		sim.submit_command(0, Dirs.RIGHT, false)
+		sim.step()
+
+	sim.submit_command(0, Vector2i.ZERO, true)
+	sim.step()
+	for i in sim.rules.bomb_buffer_ticks:
+		sim.step()
+	sim.players[0].capacity = 2
+	sim.step()
+	eq(sim.bombs.size(), 1, "an expired press does not place a bomb late")
+
+
+func test_bomb_pressed_during_countdown_drops_on_go() -> void:
+	var sim = Factory.build(OPEN)
+	sim.phase = MatchSim.Phase.COUNTDOWN
+	sim.phase_ticks_left = 3
+
+	sim.submit_command(0, Vector2i.ZERO, true)
+	for i in 3:
+		sim.step()
+		if sim.phase == MatchSim.Phase.COUNTDOWN:
+			sim.submit_command(0, Vector2i.ZERO, false)
+	eq(sim.phase, MatchSim.Phase.PLAYING, "countdown finished")
+
+	sim.step()
+	eq(sim.bombs.size(), 1, "queued countdown press drops on the first playing tick")

@@ -21,4 +21,5 @@ func test_speed_curve_is_monotonic_and_capped() -> void:
 		previous = speed
 	eq(rules.speed_fp_for_level(0), rules.base_speed_fp, "level 0 is base speed")
 	eq(rules.speed_fp_for_level(99), rules.max_speed_fp, "speed is capped")
-	eq(rules.ticks_to_cross_a_tile(rules.base_speed_fp), 19, "base speed crosses a tile in 19 ticks")
+	eq(rules.ticks_to_cross_a_tile(rules.base_speed_fp), 16, "base speed crosses a tile in 16 ticks")
+	eq(rules.bomb_buffer_ticks, 6, "bomb presses are buffered for 100 ms")

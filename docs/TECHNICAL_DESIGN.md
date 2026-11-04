@@ -55,7 +55,7 @@ target efficiently.
 
 The existing web prototype is **not** deleted or modified. Reused as evidence and design input:
 
-- Validated rules: 3.15 → 5.4 tiles/s speed, 2.4 s fuse, 450 ms blast, capacity 1→5,
+- Validated rules: 3.75 → 6.1 tiles/s speed, 2.4 s fuse, 450 ms blast, capacity 1→5,
   range 2→6, 34 % crate drop.
 - Arena generation approach (seeded, border walls, pillar lattice, guaranteed spawns).
 - Match phase machine: lobby → countdown → playing → results → rematch.

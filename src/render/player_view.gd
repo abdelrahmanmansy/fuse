@@ -210,7 +210,10 @@ func sync(player, grid_size: Vector2i, delta: float) -> void:
 	var facing: Vector2i = player.facing
 	if facing != Vector2i.ZERO:
 		var target_yaw := atan2(float(facing.x), float(facing.y))
-		_yaw = lerp_angle(_yaw, target_yaw, clampf(delta * 16.0, 0.0, 1.0))
+		# A reversal is a 180° turn: snap it faster so the body catches up with the
+		# instant movement instead of moonwalking for a fifth of a second.
+		var turn_rate := 30.0 if absf(angle_difference(_yaw, target_yaw)) > 2.0 else 16.0
+		_yaw = lerp_angle(_yaw, target_yaw, clampf(delta * turn_rate, 0.0, 1.0))
 	_pivot.rotation.y = _yaw
 
 	var moving: bool = player.moving

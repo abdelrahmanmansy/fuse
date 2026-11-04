@@ -20,11 +20,17 @@ var fuse_ticks: int = 144               # 2.4 s
 var blast_ticks: int = 27               # 0.45 s
 var spawn_guard_ticks: int = 120        # 2.0 s
 
-# Movement: 3.15 tiles/s and 0.45 tiles/s per upgrade, capped near 5.5 tiles/s
-var base_speed_fp: int = 54
+# Movement: 3.75 tiles/s and 0.47 tiles/s per upgrade, capped near 6.1 tiles/s.
+# 64 fp/tick = exactly 16 ticks per tile, which keeps the grid step snappy without
+# making late-game speed unreadable.
+var base_speed_fp: int = 64
 var speed_step_fp: int = 8
-var max_speed_fp: int = 94
+var max_speed_fp: int = 104
 var max_speed_level: int = 5
+
+# Input feel: a bomb press stays queued for this many ticks, so pressing a few
+# frames before a slot frees or before the countdown ends still places the bomb.
+var bomb_buffer_ticks: int = 6
 
 # Player stats
 var start_capacity: int = 1

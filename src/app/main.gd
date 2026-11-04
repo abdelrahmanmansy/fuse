@@ -252,6 +252,10 @@ func _start_match() -> void:
 
 	_ensure_ai()
 	_hud.visible = _flow.screen == AppFlow.Screen.MATCH
+	# A key still held from the menu (menu confirm) must not count as a fresh
+	# gameplay press on the first tick of the round.
+	if _input_router != null:
+		_input_router.reset()
 	_update_views(0.0)
 
 
@@ -359,6 +363,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.physical_keycode == KEY_ESCAPE and _settings_screen != null and _settings_screen.visible:
 			_on_settings_closed()
 			get_viewport().set_input_as_handled()
+			return
+
+	# Latch real presses for gameplay so taps between ticks are never dropped.
+	if _input_router != null and _flow != null and _flow.screen == AppFlow.Screen.MATCH:
+		_input_router.handle_event(event)
+
+
+func _notification(what: int) -> void:
+	# Alt-tabbing must not leave keys stuck or bank a frame burst on return.
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if _input_router != null:
+			Input.flush_buffered_events()
+			_input_router.suspend()
+		_accum = 0.0
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		if _input_router != null:
+			_input_router.resume()
+		_accum = 0.0
 
 
 func _open_settings() -> void:
@@ -435,6 +457,11 @@ func _set_paused(on: bool) -> void:
 	if _flow.screen != AppFlow.Screen.MATCH:
 		return
 	_paused = on
+	# Never resume by replaying the frames spent in the menu, and never let a
+	# press queued while paused fire as soon as play resumes.
+	_accum = 0.0
+	if _input_router != null:
+		_input_router.clear_latches()
 	_hud.visible = not on
 	if on:
 		_pause_menu.open()

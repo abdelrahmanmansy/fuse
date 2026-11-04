@@ -110,6 +110,7 @@ func alive_count() -> int:
 func step() -> void:
 	tick += 1
 	if phase == Phase.COUNTDOWN:
+		_buffer_countdown_bombs()
 		phase_ticks_left -= 1
 		if phase_ticks_left <= 0:
 			_enter_playing()
@@ -141,6 +142,17 @@ func _enter_playing() -> void:
 	_emit(SimEvent.Type.PHASE_CHANGED, {"phase": phase})
 
 
+## A bomb pressed during READY stays queued until GO instead of being dropped.
+## Direction is re-read every tick anyway, so only the edge-triggered bomb needs this.
+func _buffer_countdown_bombs() -> void:
+	for player in players:
+		if not player.alive:
+			continue
+		var command: Dictionary = _commands.get(player.id, EMPTY_COMMAND)
+		if command["bomb"]:
+			player.bomb_buffer = maxi(player.bomb_buffer, rules.bomb_buffer_ticks)
+
+
 func _step_active() -> void:
 	for player in players:
 		if not player.alive:
@@ -150,7 +162,12 @@ func _step_active() -> void:
 		if player.spawn_guard > 0:
 			player.spawn_guard -= 1
 		if command["bomb"]:
-			_try_place_bomb(player)
+			player.bomb_buffer = maxi(player.bomb_buffer, rules.bomb_buffer_ticks)
+		if player.bomb_buffer > 0:
+			if _try_place_bomb(player):
+				player.bomb_buffer = 0
+			else:
+				player.bomb_buffer -= 1
 		_collect_pickups(player)
 
 	_update_bombs()
@@ -165,6 +182,14 @@ func _step_active() -> void:
 ## --- movement -----------------------------------------------------------------
 
 func _move_player(player, want: Vector2i) -> void:
+	# Pressing the opposite direction reverses the step in place instead of
+	# waiting for the tile boundary. This is the single biggest feel win: the
+	# character reacts on the tick you press, not up to 16 ticks later.
+	if player.moving and not Dirs.is_zero(want):
+		var travel: Vector2i = _move_direction(player)
+		if want == Vector2i(-travel.x, -travel.y) and _can_reverse(player):
+			_reverse_move(player, want)
+
 	# A zero direction means "no input": drop any buffered intent so releasing a
 	# key stops the player at the next tile boundary instead of chaining on.
 	if Dirs.is_zero(want):
@@ -199,6 +224,30 @@ func _move_player(player, want: Vector2i) -> void:
 			break
 
 
+func _move_direction(player) -> Vector2i:
+	return player.move_to - player.move_from
+
+
+## Reversing must not walk back into a bomb or through a wall that appeared.
+func _can_reverse(player) -> bool:
+	var target: Vector2i = player.move_from
+	if not grid.is_walkable(target.x, target.y):
+		return false
+	return not _bombs_by_tile.has(target)
+
+
+## Swap the step's endpoints and mirror the progress, so the visible position is
+## unchanged on the reversal tick and the walk continues the other way.
+func _reverse_move(player, want: Vector2i) -> void:
+	var forward: Vector2i = _move_direction(player)
+	player.tile = player.move_to
+	player.move_from = player.move_to
+	player.move_to = player.tile - forward
+	player.move_progress = FIXED_ONE - player.move_progress
+	player.facing = want
+	player.buffered_dir = want
+
+
 func _start_move(player, dir: Vector2i) -> bool:
 	if Dirs.is_zero(dir):
 		return false
@@ -224,14 +273,15 @@ func _start_move(player, dir: Vector2i) -> bool:
 
 ## --- bombs --------------------------------------------------------------------
 
-func _try_place_bomb(player) -> void:
+func _try_place_bomb(player) -> bool:
 	var tile: Vector2i = player.nearest_tile()
 	if _bombs_by_tile.has(tile):
-		return
+		return false
 	if _active_bombs(player.id) >= player.capacity:
-		return
+		return false
 	var bomb = _spawn_bomb(player.id, tile, rules.fuse_ticks, player.blast_range)
 	_emit(SimEvent.Type.BOMB_PLACED, {"bomb_id": bomb.id, "tile": tile, "owner": player.id})
+	return true
 
 
 ## Public spawner for adventure scripts and tests. Returns null if blocked.
@@ -580,6 +630,7 @@ func state_hash() -> int:
 		h = _mix(h, player.capacity)
 		h = _mix(h, player.blast_range)
 		h = _mix(h, 1 if player.has_kick else 0)
+		h = _mix(h, player.bomb_buffer)
 		h = _mix(h, 1 if player.alive else 0)
 		h = _mix(h, player.spawn_guard)
 

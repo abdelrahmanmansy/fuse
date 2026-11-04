@@ -42,6 +42,10 @@ func _run() -> void:
 	_check(L10n.locale == "en", "UI test runs in English first")
 
 	# Settings screen: reachable from the title, adjustable and savable.
+	# Normalize the slider so RIGHT always has room to raise it, even when an
+	# earlier run left the test settings file at 100 %.
+	_main._settings.master_volume = 0.5
+	_main._on_settings_changed()
 	var series_before: int = _main._settings.best_of
 	var volume_before: float = _main._settings.master_volume
 	await _press(KEY_DOWN)          # SOLO

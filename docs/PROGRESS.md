@@ -15,7 +15,8 @@ code-built primitives; no music, no external models/textures.**
 | M0 foundation | ✅ complete, committed `f9742e7` |
 | M1 grey-box playable | ✅ complete, committed `4979242` |
 | M2 local versus front end | ✅ complete, committed `ee511a0` |
-| M2.5 localization + classic art pass | ✅ complete, verified (63 tests, 56 UI checks, 9 captures) |
+| M2.5 localization + classic art pass | ✅ complete, committed `162e633` |
+| M2.6 input & feel pass | ✅ complete, verified (74 tests, 525 assertions) |
 | M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
@@ -105,6 +106,51 @@ windowed run, 240 frames               (EXIT=0)
 5. **Arabic text needed font fallback, not just translation.** Godot's default font has no
    Arabic coverage; `theme_builder.gd` attaches Noto Sans Arabic as a fallback and the RTL
    direction is set on the menu root.
+
+---
+
+## M2.6 — input & feel pass (verified)
+
+### What changed for the player
+
+- **Instant turnaround.** Pressing the opposite direction mid-step now reverses the
+  character on the spot instead of finishing the tile first. Reversing into an armed bomb
+  is refused, so you cannot clip through it.
+- **Faster base movement.** Base speed raised from 54 to 64 fixed-point units per tick
+  (3.15 → 3.75 tiles/s, 19 → 16 ticks per tile). The upgrade curve now tops out at
+  104 fp (≈6.1 tiles/s) instead of 94.
+- **No dropped presses.** Bomb, pause, restart and mode keys are latched from the real
+  input event as it happens, then consumed by the next simulation tick. A tap that starts
+  and ends between two ticks is no longer lost, even during a frame hitch.
+- **Bomb input buffer.** A bomb press stays queued for 6 ticks (100 ms), so pressing just
+  before a capacity slot frees or before the countdown ends still places the bomb on the
+  first legal tick. Presses during READY carry into GO instead of being discarded.
+- **Better analog stick.** Deadzone lowered from 0.40 to 0.28 and the most-deflected axis
+  now wins, so diagonal pushes follow the direction you actually mean.
+- **Cleaner shell.** Pausing/unpausing resets the tick accumulator (no catch-up burst),
+  focus loss suspends device reads and clears queued presses (no stuck keys on return),
+  and starting a round syncs the edge trackers so the menu-confirm keypress cannot drop
+  a bomb on tick one.
+
+### Verification evidence
+
+```
+74 test(s), 525 assertion(s), 0 failure(s)
+PASS                                   (EXIT=0)
+UI flow: 56 check(s)                   (EXIT=0)
+SMOKE_EXIT=0 · SELFPLAY_EXIT=0 · BOUNDARY_EXIT=0
+```
+
+New coverage: mid-tile reversal, reversal blocked by a bomb, bomb-press buffering and
+expiry, countdown buffering, and `tests/test_input_router.gd` for event latching
+(bomb/P2/global actions/clear/suspend). Golden hashes were intentionally regenerated for
+the new speed curve and buffered-bomb state:
+
+| Scenario | Hash |
+| --- | --- |
+| seed 4242, 600 ticks, scripted | `3618636086` |
+| seed 4242, 200 ticks, idle | `3308826698` |
+| seed 4242, 200 ticks, scripted | `4227721462` |
 
 ---
 
@@ -361,7 +407,8 @@ Pure `RefCounted` scripts, no nodes, no clock, no input, no audio:
 Behavior contracts pinned by tests:
 
 - Fixed 60 Hz integer ticks; movement in fixed-point units (1024 = 1 tile); base speed
-  crosses a tile in 19 ticks and carries the remainder across chained tiles.
+  crosses a tile in 16 ticks (3.75 tiles/s) and carries the remainder across chained
+  tiles. Pressing the opposite direction mid-tile reverses the step in place.
 - Input is command-in: `submit_command(player_id, dir, bomb)`, last write per tick wins;
   outcomes come out as ordered `SimEvent`s via `take_events()`.
 - Bomb fuse starts at 144 ticks (2.4 s) and is decremented on the placement tick;
@@ -377,13 +424,13 @@ Behavior contracts pinned by tests:
 ### 5. Golden hashes
 
 Locked in `tests/test_golden.gd` (regenerate with `tools/dump_golden_hash.gd` only when
-a simulation change is intentional):
+a simulation change is intentional; regenerated in M2.6 for the input/speed pass):
 
 | Scenario | Hash |
 | --- | --- |
-| seed 4242, 600 ticks, scripted commands | `3530677916` |
-| seed 4242, 200 ticks, idle | `1752669574` |
-| seed 4242, 200 ticks, scripted | `4161587804` |
+| seed 4242, 600 ticks, scripted commands | `3618636086` |
+| seed 4242, 200 ticks, idle | `3308826698` |
+| seed 4242, 200 ticks, scripted | `4227721462` |
 
 Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 
