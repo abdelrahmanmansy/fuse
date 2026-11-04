@@ -4,7 +4,9 @@ extends CanvasLayer
 
 const Style = preload("res://src/render/arena_style.gd")
 const MatchSim = preload("res://src/core/sim/match_sim.gd")
+const L10n = preload("res://src/app/l10n.gd")
 
+var _root: Control
 var _timer: Label
 var _phase: Label
 var _banner: Label
@@ -19,6 +21,7 @@ func setup(player_count: int) -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	_root = root
 
 	_timer = _label(root, 56, Color(0.93, 0.95, 1.0))
 	_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -49,7 +52,7 @@ func setup(player_count: int) -> void:
 
 	_hint = _label(root, 19, Color(0.72, 0.79, 0.88))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.text = "P1 WASD + Space    P2 Arrows + Enter    R restart    1 / 2 mode    Esc pause"
+	_hint.text = L10n.t("hud.hint")
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 0)
 	_hint.offset_left = -620
 	_hint.offset_right = 620
@@ -74,37 +77,37 @@ func update_from_sim(sim, mode: String) -> void:
 	if sim.phase == MatchSim.Phase.COUNTDOWN:
 		var ticks: int = sim.phase_ticks_left
 		var number := int(ceil(float(ticks) / 60.0))
-		countdown = "GO!" if number <= 0 else str(number)
+		countdown = L10n.t("hud.go") if number <= 0 else str(number)
 		if number > 3:
-			countdown = "READY"
+			countdown = L10n.t("hud.ready")
 		_banner.text = countdown
 		_banner.visible = true
 	elif sim.phase == MatchSim.Phase.RESULTS:
 		if sim.winner_id >= 0:
-			_banner.text = "PLAYER %d WINS" % (sim.winner_id + 1)
+			_banner.text = L10n.t("hud.winner") % (sim.winner_id + 1)
 			_banner.add_theme_color_override("font_color", Style.PLAYER_COLORS[sim.winner_id % Style.PLAYER_COLORS.size()])
 		else:
-			_banner.text = "DRAW"
+			_banner.text = L10n.t("hud.draw")
 			_banner.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
 		_banner.visible = true
 
 	if sim.phase == MatchSim.Phase.PLAYING and sim.match_ticks_left > sim.rules.match_ticks - 30:
-		_banner.text = "GO!"
+		_banner.text = L10n.t("hud.go")
 		_banner.add_theme_color_override("font_color", Color(0.72, 1.0, 0.62))
 		_banner.visible = true
 
 
 func _phase_text(sim, mode: String) -> String:
-	var phase := "SUDDEN DEATH" if sim.phase == MatchSim.Phase.SUDDEN_DEATH else ""
+	var phase := L10n.t("hud.phase_sudden") if sim.phase == MatchSim.Phase.SUDDEN_DEATH else ""
 
 	if sim.phase == MatchSim.Phase.PLAYING:
-		phase = "BATTLE"
+		phase = L10n.t("hud.phase_battle")
 	elif sim.phase == MatchSim.Phase.RESULTS:
-		phase = "RESULTS"
+		phase = L10n.t("hud.phase_results")
 	elif sim.phase == MatchSim.Phase.IDLE:
-		phase = "STANDBY"
+		phase = L10n.t("hud.phase_standby")
 	elif sim.phase == MatchSim.Phase.COUNTDOWN:
-		phase = "GET READY"
+		phase = L10n.t("hud.phase_ready")
 	return "%s   ·   %s" % [phase, mode]
 
 
@@ -139,11 +142,26 @@ func _build_panel(root: Control, index: int, player_count: int) -> Dictionary:
 	panel.add_child(box)
 
 	var name_label := _label(box, 24, Style.PLAYER_COLORS[index % Style.PLAYER_COLORS.size()])
-	name_label.text = "PLAYER %d" % (index + 1)
+	name_label.text = L10n.t("player") % (index + 1)
 	var stats := _label(box, 20, Color(0.92, 0.95, 1.0))
 	stats.text = ""
 
 	return {"panel": panel, "stats": stats, "name": name_label}
+
+
+func retranslate() -> void:
+	_hint.text = L10n.t("hud.hint")
+	for i in _panels.size():
+		_panels[i]["name"].text = L10n.t("player") % (i + 1)
+
+
+func set_rtl(on: bool) -> void:
+	if _root == null:
+		return
+	_root.layout_direction = Control.LAYOUT_DIRECTION_RTL if on else Control.LAYOUT_DIRECTION_LTR
+	for i in _panels.size():
+		_panels[i]["name"].horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if on else HORIZONTAL_ALIGNMENT_LEFT
+		_panels[i]["stats"].horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if on else HORIZONTAL_ALIGNMENT_LEFT
 
 
 func _update_panel(index: int, sim) -> void:
@@ -152,12 +170,12 @@ func _update_panel(index: int, sim) -> void:
 		return
 	var player = sim.players[index]
 	var stats: Label = _panels[index]["stats"]
-	var text := "BOMBS %d   RANGE %d   SPEED %d   KICK %s" % [
+	var text := L10n.t("hud.stats") % [
 		player.capacity, player.blast_range, player.speed_level,
-		"YES" if player.has_kick else "NO",
+		L10n.t("hud.yes") if player.has_kick else L10n.t("hud.no"),
 	]
 	if not player.alive:
-		text = "ELIMINATED"
+		text = L10n.t("hud.eliminated")
 		stats.add_theme_color_override("font_color", Color(1.0, 0.42, 0.38))
 	else:
 		stats.add_theme_color_override("font_color", Color(0.92, 0.95, 1.0))

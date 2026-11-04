@@ -11,6 +11,10 @@ export/
 *.apk
 *.aab
 
+# Docs screenshots are documentation only — never loaded by the game, so their
+# Godot import metadata is noise.
+docs/screenshots/*.import
+
 # OS / editor noise
 .DS_Store
 Thumbs.db

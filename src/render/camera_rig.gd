@@ -7,7 +7,7 @@ extends Camera3D
 
 const Style = preload("res://src/render/arena_style.gd")
 
-const ELEVATION_DEG := 56.0
+const ELEVATION_DEG := 68.0
 const FIT_MARGIN := 0.90
 
 var _base_position: Vector3 = Vector3(0, 25, 17)

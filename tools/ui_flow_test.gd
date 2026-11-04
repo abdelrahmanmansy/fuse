@@ -10,6 +10,7 @@ extends SceneTree
 const MainScene = preload("res://scenes/main.tscn")
 const AppFlow = preload("res://src/app/app_flow.gd")
 const MatchSim = preload("res://src/core/sim/match_sim.gd")
+const L10n = preload("res://src/app/l10n.gd")
 
 var _main
 var _failures: Array[String] = []
@@ -32,6 +33,13 @@ func _run() -> void:
 
 	# Keep this run from touching the player's real settings file.
 	_main._settings.path = "user://settings_uitest.json"
+
+	# Never inherit a locale from an earlier run: the Arabic toggle below assumes
+	# the session starts in English.
+	if _main._settings.locale != "en":
+		_main._settings.locale = "en"
+		_main._on_settings_changed()
+	_check(L10n.locale == "en", "UI test runs in English first")
 
 	# Settings screen: reachable from the title, adjustable and savable.
 	var series_before: int = _main._settings.best_of
@@ -64,8 +72,25 @@ func _run() -> void:
 	_main._on_settings_changed()
 	_check(_main._flow.best_of == 3, "series length set back to best of 3")
 
-	# Leave via BACK.
+	# Move to LANGUAGE, switch to Arabic and confirm live retranslation + RTL.
 	await _press(KEY_DOWN)          # fullscreen
+	await _press(KEY_DOWN)          # language
+	await _press(KEY_ENTER)         # switch to Arabic
+	_check(_main._settings.locale == "ar", "ENTER switches to Arabic")
+	_check(L10n.locale == "ar", "localization layer follows the setting")
+	_check(_main._settings_screen._title_label.text == L10n.table("ar")["settings.title"],
+		"settings title retranslates immediately")
+	_check(_main._settings_screen._root.layout_direction == Control.LAYOUT_DIRECTION_RTL,
+		"settings layout mirrors for Arabic")
+	_check(_main._title._tagline.text == L10n.table("ar")["tagline"],
+		"hidden screens retranslate too")
+	await _press(KEY_ENTER)         # back to English
+	_check(_main._settings.locale == "en", "ENTER switches back to English")
+	_check(L10n.locale == "en", "localization layer follows back to English")
+	_check(_main._settings_screen._root.layout_direction == Control.LAYOUT_DIRECTION_LTR,
+		"layout returns to left-to-right")
+
+	# Leave via BACK.
 	await _press(KEY_DOWN)          # back
 	await _press(KEY_ENTER)
 	_check(not _main._settings_screen.visible, "BACK closes settings")

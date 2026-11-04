@@ -22,7 +22,9 @@ static func label(text: String, size: int, color: Color = TEXT) -> Label:
 	return node
 
 
-static func dim(alpha: float = 0.82) -> ColorRect:
+## Dark scrim behind menus. Light enough that the live attract match still reads
+## through, dark enough to keep white text high contrast.
+static func dim(alpha: float = 0.58) -> ColorRect:
 	var rect := ColorRect.new()
 	rect.color = Color(0.012, 0.018, 0.030, alpha)
 	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

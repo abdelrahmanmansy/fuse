@@ -6,6 +6,14 @@ signal settings_requested
 signal quit_requested
 
 const AppFlow = preload("res://src/app/app_flow.gd")
+const L10n = preload("res://src/app/l10n.gd")
+
+var _tagline: Label
+var _build_tag: Label
+var _local: Button
+var _solo: Button
+var _settings_button: Button
+var _quit_button: Button
 
 
 func _build() -> void:
@@ -15,33 +23,44 @@ func _build() -> void:
 	title.add_theme_color_override("font_outline_color", Color(0.040, 0.320, 0.520))
 	_column.add_child(title)
 
-	var subtitle := UiKit.label("2 . 5 D   B O M B   A R E N A", 26, UiKit.ACCENT)
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_column.add_child(subtitle)
+	_tagline = UiKit.label("", 26, UiKit.ACCENT)
+	_tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_column.add_child(_tagline)
 
-	var build_tag := UiKit.label("M2 preview · grey-box build", 18, UiKit.TEXT_DIM)
-	build_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_column.add_child(build_tag)
+	_build_tag = UiKit.label("", 18, UiKit.TEXT_DIM)
+	_build_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_column.add_child(_build_tag)
 
 	_column.add_child(_spacer(26))
 
-	var local := UiKit.button("LOCAL VERSUS   ·   2 PLAYERS")
-	local.pressed.connect(func() -> void: mode_selected.emit(AppFlow.MODE_2P))
-	_column.add_child(local)
+	_local = UiKit.button("")
+	_local.pressed.connect(func() -> void: mode_selected.emit(AppFlow.MODE_2P))
+	_column.add_child(_local)
 
-	var solo := UiKit.button("SOLO   ·   1 PLAYER VS CPU")
-	solo.pressed.connect(func() -> void: mode_selected.emit(AppFlow.MODE_1P))
-	_column.add_child(solo)
+	_solo = UiKit.button("")
+	_solo.pressed.connect(func() -> void: mode_selected.emit(AppFlow.MODE_1P))
+	_column.add_child(_solo)
 
-	var settings_button := UiKit.button("SETTINGS")
-	settings_button.pressed.connect(func() -> void: settings_requested.emit())
-	_column.add_child(settings_button)
+	_settings_button = UiKit.button("")
+	_settings_button.pressed.connect(func() -> void: settings_requested.emit())
+	_column.add_child(_settings_button)
 
-	var quit := UiKit.button("QUIT")
-	quit.pressed.connect(func() -> void: quit_requested.emit())
-	_column.add_child(quit)
+	_quit_button = UiKit.button("")
+	_quit_button.pressed.connect(func() -> void: quit_requested.emit())
+	_column.add_child(_quit_button)
 
-	add_footer("UP / DOWN choose    ·    ENTER or SPACE confirm    ·    controllers supported")
+	add_footer("")
+	retranslate()
+
+
+func retranslate() -> void:
+	_tagline.text = L10n.t("tagline")
+	_build_tag.text = L10n.t("build_tag")
+	_local.text = L10n.t("menu.local2p")
+	_solo.text = L10n.t("menu.solo")
+	_settings_button.text = L10n.t("menu.settings")
+	_quit_button.text = L10n.t("menu.quit")
+	set_footer(L10n.t("hint.nav"))
 
 
 func _spacer(height: int) -> Control:

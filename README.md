@@ -3,21 +3,29 @@
 Working title for a modern **2.5D bomb-arena action game** (Atomic Bomberman-inspired),
 built in **Godot 4.7.2**. Windows first, Android after.
 
-> **Status: M2 — local versus front end (verified).**
+> **Status: M2.5 — localized front end + classic art pass (verified).**
 > Title screen with a live AI attract match → mode select → best-of series → results →
 > rematch. Pause menu, persisted settings, and event-driven procedural sound effects are
-> in. Characters, bombs, fire and pickups are still **code-built grey-box meshes** with
-> procedural motion — there is no character art, no music and no Arabic localization yet.
+> in. **Arabic and English ship from day one**, with RTL layout and a bundled
+> Arabic-capable font. The arena now reads like classic Bomberman: grass checkerboard,
+> terracotta brick pillars, wooden crates, white-suited characters with coloured helmets,
+> glossy black bombs and layered fire. All art is still **code-built 3D primitives and
+> shaders** — no external models or textures, and no music yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for exactly what exists and what does not.
 
-![Title screen](docs/screenshots/m2-title.png)
+![Title screen](docs/screenshots/m2-title-en.png)
 
-*Real captured frame from `--capture` mode — title panel over a running AI attract match.*
+*Real captured frame from `--capture` mode — English title panel over a running AI attract
+match.*
 
-![Grey-box match](docs/screenshots/m1-gameplay.png)
+![Arabic title screen](docs/screenshots/m2-title-ar.png)
 
-*Real captured frame from `--shot` mode, tick 362: two fighters, an armed bomb, six blast
-tiles and one pickup.*
+*The same screen in Arabic: translated strings and a right-to-left menu column.*
+
+![Classic match](docs/screenshots/m2-gameplay-en.png)
+
+*Real captured frame from `--shot` mode, tick 1101: two fighters, an armed bomb, fire and
+pickups on the green checkerboard.*
 
 ---
 
@@ -51,6 +59,14 @@ cd "C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse"
 
 The game boots to the title screen; an AI-vs-AI match plays behind the menu as an
 attract demo. Menus are fully keyboard and controller navigable.
+
+### Language
+
+The interface ships in **English and Arabic** from day one. Settings exposes a language
+row; the choice is persisted in `user://settings.json` and applied immediately, including
+right-to-left layout for Arabic. Fonts are bundled under `assets/fonts/` (Noto Sans plus
+Noto Sans Arabic, both OFL) so no system font is required. Add `--locale=ar` (or `--locale=en`)
+after `--` to force a locale for captures and tests.
 
 ### Menus
 
@@ -87,6 +103,7 @@ its own blast lane.
 **SETTINGS** lives on the title screen:
 
 - master volume and SFX volume (applied live, persisted)
+- language (English / العربية)
 - series length (best of 1 / 3 / 5)
 - fullscreen toggle
 - values are stored in `user://settings.json`
@@ -100,6 +117,21 @@ crate break, explosion, pickup chime, hit and win jingle — and played through 
 pool driven by simulation events. There are no audio files and no music track yet; M3
 replaces the placeholders with designed sound while keeping the event wiring.
 
+## Art
+
+The arena is drawn entirely by code — no imported models or textures yet:
+
+- a single world-space slab shader paints the **green grass checkerboard** with dark tile
+  seams, per-tile tone jitter and grass speckle;
+- brick and timber shaders supply the **terracotta pillars** and **wooden crates**;
+- fighters are white-suited characters with coloured helmets, gloves and boots, blinking
+  eyes, an antenna, and procedural walk bob, lean, arm swing and squash;
+- bombs are glossy black spheres with an angled animated fuse; explosions layer additive
+  flame cones, ground glow and orbiting licks; pickups are emissive icons on rings.
+
+The 68° camera and the stone-capped walls are tuned so the board reads top-down like the
+classic games. Every screenshot in this README is a real capture from the running build.
+
 ## Run the tests
 
 ```powershell
@@ -108,7 +140,7 @@ $godot = "$env:LOCALAPPDATA\Programs\Godot\4.7.2\Godot_v4.7.2-stable_win64_conso
 & $godot --headless --path . --script res://tests/run_tests.gd
 ```
 
-Expected: `55 test(s), 313 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
+Expected: `63 test(s), 487 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
 Add `-- --verbose` to list each test by name.
 
 End-to-end menu test (real scene tree, synthesized key events, real AI matches to a
@@ -118,7 +150,7 @@ finished series):
 & $godot --headless --path . --script res://tools/ui_flow_test.gd
 ```
 
-Expected: `UI flow: 47 check(s)`, `PASS`, exit code `0`. It covers title → settings
+Expected: `UI flow: 56 check(s)`, `PASS`, exit code `0`. It covers title → settings
 (volume + series changes, plus ESC-to-close), title → 1P match, pause/resume, a genuine
 AI-decided round, round 2, a decided series, rematch, and quit back to title.
 
@@ -149,46 +181,59 @@ bombs, fire and at least two living fighters, then writes a PNG and quits:
 
 ```powershell
 New-Item -ItemType Directory build\shots -Force | Out-Null
-$shot = (Resolve-Path build\shots).Path + "\m1.png"
-& $godot --path . --resolution 1600x900 -- --shot=$shot --shot-ticks=360 --seed=4242
+$shot = (Resolve-Path build\shots).Path + "\game.png"
+& $godot --path . --resolution 1600x900 -- --shot=$shot --shot-ticks=1100 --seed=2024
 ```
 
 Menu capture mode renders a specific screen after a few frames:
 
 ```powershell
-$out = (Resolve-Path build\shots).Path + "\m2-settings.png"
-& $godot --path . --resolution 1600x900 -- --capture=$out --capture-screen=settings
+$out = (Resolve-Path build\shots).Path + "\settings.png"
+& $godot --path . --resolution 1600x900 -- --capture=$out --capture-screen=settings --locale=ar
 ```
 
 `--capture-screen` accepts `title`, `settings`, `pause` or `series`.
 Shot flags (after `--`): `--shot=<path>`, `--shot-ticks=<n>` (default 480),
 `--seed=<n>`. Capture flags: `--capture=<path>`, `--capture-screen=<name>`,
-`--capture-after=<frames>` (default 24).
+`--capture-after=<frames>` (default 24), `--locale=<en|ar>`.
 
-Two PowerShell helpers inspect a capture without opening it:
+Three PowerShell helpers inspect a capture without opening it:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools/preview_png.ps1 build\shots\m2-title.png 100 34
-powershell -ExecutionPolicy Bypass -File tools/analyze_png.ps1 build\shots\m2-settings.png
+powershell -ExecutionPolicy Bypass -File tools/preview_png.ps1 build\shots\game.png 100 34
+powershell -ExecutionPolicy Bypass -File tools/analyze_png.ps1 build\shots\game.png
+powershell -ExecutionPolicy Bypass -File tools/letter_map.ps1 build\shots\game.png 20
 ```
 
 `preview_png.ps1` prints an ASCII luminance map; `analyze_png.ps1` reports accent
-colours (player/fire/text) and their screen positions.
+colours (player/fire/text) and their screen positions; `letter_map.ps1` classifies pixels
+into green floor, brown crate, stone wall, blue, white and dark, which is how the arena
+palette is regression-checked.
+
+### Debug: isolate a render layer
+
+Add `--hide=<tokens>` after `--` to hide arena layers while diagnosing composition.
+Tokens: `floor`, `slab`, `walls`, `caps`, `crates`.
+
+```powershell
+& $godot --path . --resolution 1600x900 -- --shot=$shot --hide=crates,walls,caps
+```
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
 | `src/core/` | Pure simulation: grid, rules, arena, match state, events. No nodes, scenes, audio, input, clock or `await`. |
-| `src/render/` | Grey-box 3D views (arena, player, bomb, blast, pickup), palette/materials, camera rig. Read-only over sim state. |
+| `src/render/` | Classic 2.5D arena (checker/fire/character shaders + code-built meshes), palette/materials, camera rig. Read-only over sim state. |
 | `src/input/` | Keyboard/gamepad → `{dir, bomb}` commands. The only device-aware layer. |
 | `src/ai/` | Deterministic command-emitting opponent (normal match participant). |
-| `src/app/` | Game shell: app flow, settings persistence, fixed-tick driver, lighting, shot/capture modes. |
+| `src/app/` | Game shell: app flow, localization, settings persistence, fixed-tick driver, lighting, shot/capture modes. |
 | `src/audio/` | Procedural SFX synthesis and an event → voice-pool director. |
-| `src/ui/` | HUD plus menu screens (title, pause, series, settings) and shared menu styling. |
+| `src/ui/` | HUD plus menu screens (title, pause, series, settings), theme/font building and shared menu styling. |
 | `scenes/` | `main.tscn` entry scene. Lobby/adventure scenes arrive M3–M4. |
-| `tests/` | Headless tests and golden state hashes. |
+| `tests/` | Headless tests, localization checks and golden state hashes. |
 | `tools/` | Self-play, UI flow test, golden-hash dump, core boundary guard, PNG analysis. |
+| `assets/fonts/` | Bundled Noto Sans + Noto Sans Arabic (OFL) with licenses. |
 | `docs/` | Technical design, progress log, screenshots. |
 | `src/online/`, `server/` | Prediction/reconciliation and authoritative server (M5, not present yet). |
 

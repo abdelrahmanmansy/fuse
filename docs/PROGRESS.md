@@ -4,19 +4,107 @@ Updated: 2026-11-04
 Environment: Windows 11 · Godot 4.7.2 stable · Python 3.12 · Node 24 · Git
 Project: `C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse`
 
-**Status: M2 complete (verified). The game boots into a real front end and plays a
-best-of series with local 1P/2P, pause, settings and procedural SFX. Character art,
-music and Arabic localization do not exist yet.**
+**Status: M2.5 complete (verified). The game boots into a localized front end (English +
+Arabic with RTL), plays a best-of series with local 1P/2P, pause, settings and procedural
+SFX, and the arena now reads like classic Bomberman (grass checkerboard, brick pillars,
+wooden crates, white-suited fighters, glossy bombs, layered fire). Character art is still
+code-built primitives; no music, no external models/textures.**
 
 | Milestone | State |
 | --- | --- |
 | M0 foundation | ✅ complete, committed `f9742e7` |
 | M1 grey-box playable | ✅ complete, committed `4979242` |
-| M2 local versus front end | ✅ complete, verified (55 tests, 47 UI checks, 4 captures) |
+| M2 local versus front end | ✅ complete, committed `ee511a0` |
+| M2.5 localization + classic art pass | ✅ complete, verified (63 tests, 56 UI checks, 9 captures) |
 | M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
 | M6 release | ⬜ not started |
+
+---
+
+## M2.5 — Arabic/English + classic art pass (verified)
+
+### What changed for the player
+
+- **The game looks like Bomberman.** A world-space floor shader paints the classic green
+  grass checkerboard with dark tile seams; pillars are terracotta brick; crates are warm
+  timber with frames and diagonal braces; fighters wear white suits with coloured helmets,
+  gloves and boots, blinking eyes and an antenna; bombs are glossy black spheres with an
+  animated angled fuse; explosions layer additive flame cones, ground glow and orbiting
+  licks; pickups are emissive icons on rings.
+- **The camera reads top-down.** Elevation raised from 56° to **68°**; wall height trimmed
+  to 1.45 and stone caps inset to 0.88 tile so the floor stays visible.
+- **Arabic ships from day one.** Every title, pause, settings, series and HUD string has
+  an Arabic translation; Arabic switches the menu column to RTL; the bundled Noto Sans
+  Arabic font provides shaping. English remains the default.
+- **Language is a persisted setting**, changed from the title's SETTINGS screen and applied
+  immediately (no restart).
+
+### New modules
+
+| File | Responsibility |
+| --- | --- |
+| `src/app/l10n.gd` | Static AR/EN string tables, `t()` lookup with English fallback, locale normalization. |
+| `src/ui/theme_builder.gd` | Builds the default theme: Noto Sans for Latin, Noto Sans Arabic fallback, per-size font overrides. |
+| `src/render/floor.gdshader` | One-slab world-space checkerboard: two grass tones, per-tile jitter, grass speckle, dark seams. |
+| `src/render/brick.gdshader` | Procedural terracotta brick and mortar. |
+| `src/render/crate.gdshader` | Procedural timber planks, dark frame and diagonal braces. |
+| `assets/fonts/` | Noto Sans + Noto Sans Arabic (OFL) and their licenses. |
+| `tests/test_l10n.gd` | Locale normalization, key coverage AR/EN, placeholder consistency, RTL flag. |
+
+`arena_view.gd` was rewritten around the shaders: one floor slab plus `MultiMesh` layers
+for walls, stone caps and crates. `player_view.gd`, `bomb_view.gd`, `blast_view.gd` and
+`pickup_view.gd` were rewritten for the classic look and richer procedural motion.
+
+### Captured evidence
+
+All frames are real 1600×900 captures from the running build.
+
+| Capture | What it shows |
+| --- | --- |
+| `docs/screenshots/m2-title-en.png` | English title block over a live attract match. |
+| `docs/screenshots/m2-title-ar.png` | The same screen in Arabic, right-to-left column. |
+| `docs/screenshots/m2-settings-en.png` / `-ar.png` | Bilingual settings card with the language row. |
+| `docs/screenshots/m2-pause-en.png` / `-ar.png` | Bilingual pause menu. |
+| `docs/screenshots/m2-series-en.png` / `-ar.png` | Bilingual results/series card. |
+| `docs/screenshots/m2-gameplay-en.png` | Tick 1101, seed 2024: two fighters, bomb, fire and pickups on the checkerboard. |
+
+Pixel check on the gameplay capture: floor tones `(93,165,74)` and `(110,185,91)`
+alternate, confirming a visible checkerboard; board composition ~40% stone, ~25% crate,
+~16% green floor, ~16% shadow.
+
+### Verification evidence
+
+```
+63 test(s), 487 assertion(s), 0 failure(s)
+PASS                                   (EXIT=0)
+
+UI flow: 56 check(s)
+PASS                                   (EXIT=0)
+
+boot smoke, 300 frames                 (EXIT=0, no SCRIPT ERROR)
+AI self-play: ticks=2768 phase=4 winner=2   (EXIT=0)
+core boundary check passed (11 file(s))     (EXIT=0)
+windowed run, 240 frames               (EXIT=0)
+```
+
+### Bugs found and fixed during M2.5
+
+1. **The "tan blanket" was wall caps, not a material bug.** Sandy albedo caps at 0.97
+   tile and raised 1.7 units covered most of the board at low camera angles. Fixed by
+   shrinking/insetting the caps, darkening them to cool stone, and raising the camera.
+2. **`source_color` uniforms rendered near-black.** Godot treats uniform defaults as sRGB
+   and converts them to linear, so values that looked right on paper came out crushed.
+   The shaders now carry sRGB-space defaults, and the floor/brick/crate palettes were
+   retuned against real captures.
+3. **`arena_style.gd` still exported the old per-tile floor colours** after the checker
+   moved into the shader; removed so there is one source of truth.
+4. **Player arm pivots were parented to the lean pivot**, so the walk swing fought the
+   lean. Shoulders now hang off `_rig` and compose cleanly.
+5. **Arabic text needed font fallback, not just translation.** Godot's default font has no
+   Arabic coverage; `theme_builder.gd` attaches Noto Sans Arabic as a fallback and the RTL
+   direction is set on the menu root.
 
 ---
 
@@ -57,14 +145,15 @@ mutes audio during automation.
 
 ### Captured evidence
 
-All frames come from the real renderer at 1600×900.
+All frames come from the real renderer at 1600×900. M2.5 re-shot every screen in both
+languages; the current files are listed in the M2.5 section above.
 
-| Capture | What the pixels show |
+| Capture (current) | What the pixels show |
 | --- | --- |
-| `docs/screenshots/m2-title.png` | Centred title block over a dimmed attract match; mean luminance 17.6; four stacked actions. |
-| `docs/screenshots/m2-settings.png` | Settings card with cyan border; the focused master-volume row draws a **gold frame at (526,324)–(1074,368)**; label rows and footer text present. |
-| `docs/screenshots/m2-pause.png` | Gold `PAUSED` heading and action buttons (1053 gold samples, centroid `(798,383)`). |
-| `docs/screenshots/m2-series.png` | Cyan results panel (`893` cyan samples, centroid `(762,301)`), round/score text and the next action. |
+| `docs/screenshots/m2-title-en.png` / `-ar.png` | Centred title block over a dimmed attract match with the checkerboard visible. |
+| `docs/screenshots/m2-settings-en.png` / `-ar.png` | Settings card with cyan border and a gold focus frame on the active row. |
+| `docs/screenshots/m2-pause-en.png` / `-ar.png` | Gold `PAUSED` heading and action buttons. |
+| `docs/screenshots/m2-series-en.png` / `-ar.png` | Cyan results panel, round/score text and the next action. |
 
 ### Verification evidence
 
@@ -178,7 +267,8 @@ PASS
 EXIT=0
 ```
 
-Captured frame `docs/screenshots/m1-gameplay.png` (seed 4242, `--shot-ticks=360`):
+Captured frame at the time (superseded by `docs/screenshots/m2-gameplay-en.png` after the
+M2.5 art pass; seed 4242, `--shot-ticks=360`):
 
 ```
 shot state: tick=362 phase=2 bombs=1 blasts=6 pickups=1 eliminations=0
@@ -302,14 +392,14 @@ Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 ## Not implemented (do not assume otherwise)
 
 - No character models, textures, rigs, animation clips or VFX sprites — all geometry is
-  grey-box primitives built from code. No `.glb`/`.blend` assets exist.
+  primitives and shaders built from code. No `.glb`/`.blend` assets exist. The "classic
+  art pass" is code, not authored art.
 - No music, mixing bus, ambience or voice. SFX are synthesized placeholders.
-- No Arabic localization. The settings model already carries a `locale` field, but there
-  are no string tables and Godot's default font has no Arabic coverage, so a bundled
-  Arabic-capable font is required before those screens exist.
 - No adventure content, world map, bosses or progression.
 - No online play: no ENet transport, prediction, reconciliation, matchmaking or server.
 - No Android build/export, controller rebinding UI, or save profiles/unlocks.
+- Arabic covers the current front end and HUD only; there is no adventure/campaign text to
+  translate yet.
 
 ## Known issues / watch items
 
@@ -329,11 +419,10 @@ Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 ## Next: M3 — vertical slice
 
 1. Pick a theme and produce a first real art direction pass (characters, bombs, arena
-   tiles, UI frames) with Blender → glTF; keep the grey-box views as a fallback path.
+   tiles, UI frames) with Blender → glTF; keep the code-built views as the fallback path.
 2. Replace runtime-synth SFX with designed audio and add one music loop plus a mixer.
 3. Character select with per-character stats/specials (rules-driven, tested headlessly).
-4. Arabic + English string tables and a bundled Arabic-capable font, starting with the
-   menu/HUD text added in M2.
-5. Menu polish: transitions, animated focus, input glyph swapping (keyboard vs pad).
-6. Expand tests: settings UI edge cases, series with changing best-of, audio voice-pool
-   exhaustion.
+4. Menu polish: transitions, animated focus, input glyph swapping (keyboard vs pad),
+   and a language switch reachable before the title.
+5. Expand tests: settings UI edge cases, series with changing best-of, audio voice-pool
+   exhaustion, Arabic string coverage for new screens.

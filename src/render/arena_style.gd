@@ -7,17 +7,18 @@ extends RefCounted
 
 const TILE_SIZE := 2.0
 const FLOOR_THICKNESS := 0.3
-const WALL_HEIGHT := 2.4
-const CRATE_HEIGHT := 1.5
+const WALL_HEIGHT := 1.45
+const CRATE_HEIGHT := 1.05
 
-const PLAYER_HEIGHT := 1.15
+const PLAYER_HEIGHT := 1.55
 const PLAYER_RADIUS := 0.34
 
 const COLOR_BG := Color(0.035, 0.045, 0.065)
-const COLOR_FLOOR_A := Color(0.085, 0.115, 0.150)
-const COLOR_FLOOR_B := Color(0.105, 0.142, 0.182)
-const COLOR_WALL := Color(0.170, 0.210, 0.262)
-const COLOR_WALL_TRIM := Color(0.235, 0.285, 0.348)
+
+# Classic arena palette: grass checkerboard (owned by floor.gdshader), terracotta
+# brick and warm timber.
+const COLOR_FLOOR_SLAB := Color(0.045, 0.075, 0.055)
+const COLOR_WALL_TRIM := Color(0.560, 0.590, 0.630)
 const COLOR_CRATE := Color(0.545, 0.353, 0.180)
 const COLOR_CRATE_TRIM := Color(0.435, 0.263, 0.118)
 
@@ -36,6 +37,10 @@ const PICKUP_COLORS := {
 }
 
 const PICKUP_LABELS := ["BOMB", "FIRE", "SPEED", "KICK"]
+
+const SUIT_COLOR := Color(0.930, 0.945, 0.965)
+const SKIN_COLOR := Color(0.984, 0.796, 0.639)
+const EYE_COLOR := Color(0.055, 0.075, 0.105)
 
 
 static func tile_to_world(tile: Vector2i, grid_size: Vector2i, height: float = 0.0) -> Vector3:
@@ -71,5 +76,13 @@ static func make_material(color: Color, emission: Color = Color.BLACK, emission_
 static func make_vertex_color_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.78
+	material.roughness = 0.82
+	return material
+
+
+static func make_shader_material(path: String) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	var shader: Shader = load(path)
+	if shader != null:
+		material.shader = shader
 	return material

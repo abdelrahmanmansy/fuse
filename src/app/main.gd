@@ -13,6 +13,9 @@ extends Node3D
 ##   --shot=<path>        fast-forward a seed and save a PNG, then quit
 ##   --shot-ticks=<n>     simulation ticks to run before the shot (default 480)
 ##   --seed=<n>           fixed arena/match seed
+##   --locale=<en|ar>     force a UI language for captures (not saved)
+##   --hide=<layers>      hide arena layers for visual debugging, comma separated
+##                        (floor,slab,walls,caps,crates)
 
 const Style = preload("res://src/render/arena_style.gd")
 const ArenaView = preload("res://src/render/arena_view.gd")
@@ -26,6 +29,8 @@ const InputRouter = preload("res://src/input/input_router.gd")
 const SimpleAi = preload("res://src/ai/simple_ai.gd")
 const AppFlow = preload("res://src/app/app_flow.gd")
 const Settings = preload("res://src/app/settings.gd")
+const L10n = preload("res://src/app/l10n.gd")
+const ThemeBuilder = preload("res://src/ui/theme_builder.gd")
 const AudioDirector = preload("res://src/audio/audio_director.gd")
 const TitleScreen = preload("res://src/ui/screens/title_screen.gd")
 const PauseMenu = preload("res://src/ui/screens/pause_menu.gd")
@@ -80,17 +85,30 @@ var _capture_screen: String = "title"
 var _capture_after: int = 24
 var _capture_frames: int = 0
 var _capture_done: bool = false
+var _forced_locale: String = ""
+var _hidden_layers: Array[String] = []
+
+const LAYER_NODES := {
+	"floor": "Floor",
+	"slab": "FloorSlab",
+	"walls": "Walls",
+	"caps": "WallCaps",
+	"crates": "Crates",
+}
 
 
 func _ready() -> void:
 	_parse_args()
 	_settings = Settings.new()
 	_settings.load_settings()
+	if not _forced_locale.is_empty():
+		_settings.locale = _forced_locale
 	_flow = AppFlow.new()
 	_flow.best_of = _settings.best_of
 	_build_world()
 	_input_router = InputRouter.new()
 	_apply_settings()
+	_apply_locale()
 
 	if _shot_path.is_empty():
 		if _capture_path.is_empty():
@@ -106,13 +124,16 @@ func _ready() -> void:
 
 
 func _build_world() -> void:
+	# One theme for every Control: Noto Sans with an Arabic-capable fallback.
+	get_window().theme = ThemeBuilder.build()
+
 	var world_env := WorldEnvironment.new()
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = Style.COLOR_BG
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.38, 0.47, 0.62)
-	environment.ambient_light_energy = 0.46
+	environment.ambient_light_color = Color(0.40, 0.50, 0.64)
+	environment.ambient_light_energy = 0.36
 	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	environment.glow_enabled = true
 	environment.glow_intensity = 0.65
@@ -125,8 +146,8 @@ func _build_world() -> void:
 	var key_light := DirectionalLight3D.new()
 	key_light.name = "KeyLight"
 	key_light.rotation_degrees = Vector3(-57, -38, 0)
-	key_light.light_color = Color(1.0, 0.94, 0.86)
-	key_light.light_energy = 1.45
+	key_light.light_color = Color(1.0, 0.96, 0.90)
+	key_light.light_energy = 1.20
 	key_light.shadow_enabled = true
 	key_light.directional_shadow_max_distance = 90.0
 	add_child(key_light)
@@ -135,7 +156,7 @@ func _build_world() -> void:
 	fill_light.name = "FillLight"
 	fill_light.rotation_degrees = Vector3(-38, 142, 0)
 	fill_light.light_color = Color(0.52, 0.68, 1.0)
-	fill_light.light_energy = 0.35
+	fill_light.light_energy = 0.28
 	fill_light.shadow_enabled = false
 	add_child(fill_light)
 
@@ -216,6 +237,10 @@ func _start_match() -> void:
 	sim.start()
 
 	_arena_view.build(arena.grid)
+	for key in _hidden_layers:
+		var node: Node = _arena_view.get_node_or_null(String(LAYER_NODES.get(key, "")))
+		if node != null:
+			node.visible = false
 	_camera.setup(Vector2i(arena.grid.width, arena.grid.height))
 
 	for player in sim.players:
@@ -348,9 +373,10 @@ func _on_settings_closed() -> void:
 
 
 func _on_settings_changed() -> void:
-	# Live-apply so volume/fullscreen feedback is immediate; persist on close.
+	# Live-apply so volume/fullscreen/language feedback is immediate; persist on close.
 	_settings.save_settings()
 	_apply_settings()
+	_apply_locale()
 
 
 func _apply_settings() -> void:
@@ -367,6 +393,18 @@ func _apply_settings() -> void:
 		if want_fullscreen != is_fullscreen:
 			DisplayServer.window_set_mode(
 				DisplayServer.WINDOW_MODE_FULLSCREEN if want_fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
+func _apply_locale() -> void:
+	L10n.set_locale(_settings.locale if _settings != null else "en")
+	var rtl := L10n.is_rtl()
+	for screen in [_title, _pause_menu, _series, _settings_screen]:
+		if screen != null:
+			screen.set_rtl(rtl)
+			screen.retranslate()
+	if _hud != null:
+		_hud.set_rtl(rtl)
+		_hud.retranslate()
 
 
 func _on_restart_round() -> void:
@@ -498,7 +536,7 @@ func _sync_pickups(size: Vector2i, delta: float) -> void:
 
 
 func _mode_name() -> String:
-	return "1P vs CPU" if _flow.mode == AppFlow.MODE_1P else "2P LOCAL"
+	return L10n.t("mode.1p") if _flow.mode == AppFlow.MODE_1P else L10n.t("mode.2p")
 
 
 func _parse_args() -> void:
@@ -515,6 +553,13 @@ func _parse_args() -> void:
 			_capture_screen = arg.trim_prefix("--capture-screen=")
 		elif arg.begins_with("--capture-after="):
 			_capture_after = int(arg.trim_prefix("--capture-after="))
+		elif arg.begins_with("--locale="):
+			var code := arg.trim_prefix("--locale=")
+			if code == "ar" or code == "en":
+				_forced_locale = code
+		elif arg.begins_with("--hide="):
+			for token in arg.trim_prefix("--hide=").split(",", false):
+				_hidden_layers.append(token.strip_edges())
 
 
 ## Debug-only: bring a specific menu on screen so it can be captured for review.

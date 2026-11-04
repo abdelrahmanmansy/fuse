@@ -6,6 +6,7 @@ const UiKit = preload("res://src/ui/ui_kit.gd")
 
 var _root: Control
 var _column: VBoxContainer
+var _footer: Label
 
 
 func _ready() -> void:
@@ -38,14 +39,31 @@ func _build() -> void:
 
 ## Add a full-width line under the centred column (e.g. control hints).
 func add_footer(text: String, color: Color = UiKit.TEXT_DIM) -> void:
-	var footer := UiKit.label(text, 20, color)
-	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	footer.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 0)
-	footer.offset_left = -720
-	footer.offset_right = 720
-	footer.offset_top = -44
-	footer.offset_bottom = -14
-	_root.add_child(footer)
+	_footer = UiKit.label(text, 20, color)
+	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_footer.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 0)
+	_footer.offset_left = -720
+	_footer.offset_right = 720
+	_footer.offset_top = -44
+	_footer.offset_bottom = -14
+	_root.add_child(_footer)
+
+
+func set_footer(text: String) -> void:
+	if _footer != null:
+		_footer.text = text
+
+
+## Mirror the whole panel for right-to-left languages.
+func set_rtl(on: bool) -> void:
+	if _root == null:
+		return
+	_root.layout_direction = Control.LAYOUT_DIRECTION_RTL if on else Control.LAYOUT_DIRECTION_LTR
+
+
+## Subclass hook: refresh all visible strings after a locale change.
+func retranslate() -> void:
+	pass
 
 
 func open() -> void:
