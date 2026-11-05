@@ -3,7 +3,7 @@
 Working title for a modern **2.5D bomb-arena action game** (Atomic Bomberman-inspired),
 built in **Godot 4.7.2**. Windows first, Android after.
 
-> **Status: M2.7 — full-screen arena, classic art pass, input polish (verified).**
+> **Status: M2.8 — full-screen arena, classic art pass, touch/web preview (verified).**
 > Title screen with a live AI attract match → mode select → best-of series → results →
 > rematch. Pause menu, persisted settings, and event-driven procedural sound effects are
 > in. **Arabic and English ship from day one**, with RTL layout and a bundled
@@ -11,7 +11,9 @@ built in **Godot 4.7.2**. Windows first, Android after.
 > fills the 16:9 frame**, grass checkerboard, terracotta brick pillars, a dense crate
 > field, white-suited characters with coloured helmets, glossy black bombs and layered
 > fire. Movement reverses instantly, input presses are latched per event and bombs are
-> buffered for 100 ms. All art is still **code-built 3D primitives and shaders** — no
+> buffered for 100 ms. A **single-threaded Web export** adds on-screen touch pads for
+> phones, served over the local network in a landscape layout; it is a preview, not a
+> public deployment. All art is still **code-built 3D primitives and shaders** — no
 > external models or textures, and no music yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for exactly what exists and what does not.
 
@@ -61,6 +63,30 @@ cd "C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse"
 
 The game boots to the title screen; an AI-vs-AI match plays behind the menu as an
 attract demo. Menus are fully keyboard and controller navigable.
+
+### Play on a phone (local web build)
+
+The Web export is **single-threaded** and uses the **Compatibility** renderer, so it runs
+from plain HTTP on a phone browser without cross-origin isolation headers.
+
+```powershell
+# one-time: export (requires the export templates for Godot 4.7.2)
+& $godot --headless --path . --export-release "Web" build/web/index.html
+
+# every session: serve build/web on the LAN
+node tools/serve_web.mjs --port 8080
+```
+
+The server prints a LAN URL such as `http://192.168.1.20:8080/`. Open it on a phone that
+is on the same Wi-Fi or hotspot. In a live 1P match the game shows a d-pad, a BOMB button
+and a PAUSE button; the camera, HUD and pads are designed for landscape, so a portrait
+phone shows a rotate prompt instead. Touch input writes into the same `InputRouter`
+virtual slots as the keyboard, so buffering and rules are unchanged. Add `?touch=1` to
+force the pads on in a desktop browser.
+
+The host must allow inbound TCP 8080 through Windows Firewall (Windows prompts the first
+time Node listens). This is a LAN preview only: there is no hosted server, no TLS and no
+online play yet.
 
 ### Language
 
@@ -154,7 +180,7 @@ $godot = "$env:LOCALAPPDATA\Programs\Godot\4.7.2\Godot_v4.7.2-stable_win64_conso
 & $godot --headless --path . --script res://tests/run_tests.gd
 ```
 
-Expected: `77 test(s), 540 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
+Expected: `77 test(s), 546 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
 Add `-- --verbose` to list each test by name.
 
 End-to-end menu test (real scene tree, synthesized key events, real AI matches to a
@@ -243,10 +269,10 @@ Tokens: `floor`, `slab`, `walls`, `caps`, `crates`.
 | `src/ai/` | Deterministic command-emitting opponent (normal match participant). |
 | `src/app/` | Game shell: app flow, localization, settings persistence, fixed-tick driver, lighting, shot/capture modes. |
 | `src/audio/` | Procedural SFX synthesis and an event → voice-pool director. |
-| `src/ui/` | HUD plus menu screens (title, pause, series, settings), theme/font building and shared menu styling. |
+| `src/ui/` | HUD plus menu screens (title, pause, series, settings), touch pads, portrait guard, theme/font building and shared menu styling. |
 | `scenes/` | `main.tscn` entry scene. Lobby/adventure scenes arrive M3–M4. |
 | `tests/` | Headless tests, localization checks and golden state hashes. |
-| `tools/` | Self-play, UI flow test, golden-hash dump, core boundary guard, PNG analysis. |
+| `tools/` | Self-play, UI flow test, golden-hash dump, core boundary guard, PNG analysis, LAN web server. |
 | `assets/fonts/` | Bundled Noto Sans + Noto Sans Arabic (OFL) with licenses. |
 | `docs/` | Technical design, progress log, screenshots. |
 | `src/online/`, `server/` | Prediction/reconciliation and authoritative server (M5, not present yet). |

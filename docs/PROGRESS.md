@@ -1,17 +1,17 @@
 # FUSE — progress log
 
-Updated: 2026-11-04
+Updated: 2026-11-05
 Environment: Windows 11 · Godot 4.7.2 stable · Python 3.12 · Node 24 · Git
 Project: `C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse`
 
-**Status: M2.7 complete (verified). The game boots into a localized front end (English +
-Arabic with RTL), plays a best-of series with local 1P/2P, pause, settings and procedural
-SFX, and the arena now reads like classic Bomberman (grass checkerboard, brick pillars,
-wooden crates, white-suited fighters, glossy bombs, layered fire). The **21×13 arena
-fills the 16:9 frame** and its **dense crate field outnumbers the permanent pillars**.
-Character art is still code-built primitives; no music, no external models/textures.
-Touch controls are wired into the input router and unit-tested, but not yet shown on a
-build.**
+**Status: M2.8 complete (web/touch preview verified in a desktop browser; on-phone
+confirmation pending). The game boots into a localized front end (English + Arabic with
+RTL), plays a best-of series with local 1P/2P, pause, settings and procedural SFX, and the
+arena reads like classic Bomberman (grass checkerboard, brick pillars, wooden crates,
+white-suited fighters, glossy bombs, layered fire). The **21×13 arena fills the 16:9
+frame** and its **dense crate field outnumbers the permanent pillars**. Character art is
+still code-built primitives; no music, no external models/textures. A **single-threaded Web
+export** now runs in a phone browser with on-screen touch pads and a portrait guard.**
 
 | Milestone | State |
 | --- | --- |
@@ -20,11 +20,77 @@ build.**
 | M2 local versus front end | ✅ complete, committed `ee511a0` |
 | M2.5 localization + classic art pass | ✅ complete, committed `162e633` |
 | M2.6 input & feel pass | ✅ complete, committed `812d707` |
-| M2.7 full-screen arena + crate density | ✅ complete, verified (77 tests, 540 assertions) |
+| M2.7 full-screen arena + crate density | ✅ complete, committed `95bde82` |
+| M2.8 touch controls + web/phone preview | ✅ complete, verified in a desktop browser |
 | M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
 | M6 release | ⬜ not started |
+
+---
+
+## M2.8 — touch controls + web/phone preview (verified in a desktop browser)
+
+### What changed for the player
+
+- **Playable in a phone browser.** The project exports to Web with the **Compatibility**
+  renderer and **single-threaded** wasm (`variant/thread_support=false`), so it runs from
+  plain HTTP on the LAN without COOP/COEP headers or a secure context.
+- **On-screen controls.** A translucent d-pad (bottom-left), a large **BOMB** button
+  (bottom-right) and a **PAUSE** button (top-right) appear during a live 1P match. They
+  write into `InputRouter`'s virtual slots, so touch shares the keyboard path, 100 ms bomb
+  buffering and pause/restart semantics. 2P local stays keyboard/pad only.
+- **Landscape guard.** Portrait phones get a localized "rotate your phone" overlay
+  (EN/AR) instead of a letterboxed slice of the arena; touch pads hide while it is up.
+- **HUD hint** switches to `hud.hint_touch` on touch builds.
+- Focus loss clears any held virtual direction and virtual bomb latches, so a phone call
+  or app switch cannot leave the fighter walking into a bomb.
+- `?touch=1` forces the pads on in a desktop browser for testing.
+- `tools/serve_web.mjs` serves `build/web` on `0.0.0.0` with `application/wasm` and
+  no-cache headers, and prints the LAN URL.
+
+### Verification evidence
+
+```
+77 test(s), 546 assertion(s), 0 failure(s)     (EXIT=0)
+UI flow: 56 check(s)                            (EXIT=0)
+boot smoke, 180 frames                          (EXIT=0, no SCRIPT ERROR)
+web export                                      (EXIT=0)
+  index.wasm 37.68 MB · index.pck 1.94 MB · index.js 0.27 MB
+```
+
+The Web build was loaded at `http://127.0.0.1:8080/?touch=1` in the in-app Chromium:
+
+- boot log: `Build configuration: Emscripten 4.0.20, single-threaded, no GDExtension
+  support` and `OpenGL ES 3.0 (WebGL 2.0) - Compatibility`, with **no console errors**;
+- a pixel map of the live match shows the touch overlay's cyan border and the white
+  **BOMB** label at the bottom-right, and the d-pad region at the bottom-left;
+- dispatching a real `mousedown`/`mouseup` on the **PAUSE** button opened the pause panel
+  (gold `PAUSED` title, dimmed arena), proving the overlay hit-tests and reaches game
+  state through the same signal → `_set_paused()` path;
+- pressing `Esc` resumed; menus were driven with real key events (ArrowDown, Enter, Esc).
+
+Full 77/546 tests, the 56-check UI flow, the 180-frame smoke run and the core boundary
+guard all pass after the touch/orientation changes.
+
+### Not verified yet
+
+- **Actual phone hardware.** The LAN URL was not opened on the user's phone during this
+  session, so touch latency, thermal throttling and real mobile GPU performance are still
+  unmeasured. Treat the mobile build as a preview.
+- **Public hosting.** The link only works while the Node server runs and the phone is on
+  the same network (the PC is on a `172.20.10.x` hotspot). No TLS, no domain, no online
+  play.
+
+### How to serve it
+
+```powershell
+cd "C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse"
+node tools/serve_web.mjs --port 8080
+# prints: LAN: http://<pc-ip>:8080/
+```
+
+Windows Firewall must allow inbound TCP 8080 for Node.
 
 ---
 
@@ -80,15 +146,14 @@ cap stopped just before the CPU could win.
   seeds stalemate or end early. Arena balance tooling (`tools/arena_balance.gd`) is kept
   for future tuning.
 
-### Mobile groundwork (not yet on a build)
+### Mobile groundwork (finished in M2.8)
 
 - `InputRouter` gained `set_virtual_dir()` and `trigger_virtual_bomb()`. Touch input now
   enters the same command path as keyboard and gamepad, including the 100 ms bomb buffer.
 - `src/ui/touch_controls.gd` builds an on-screen d-pad, BOMB and PAUSE overlay in the
   project's UI style, with EN/AR labels and automatic release on hide.
 - Three unit tests cover virtual direction, one-shot virtual bombs, and clearing virtual
-  state when pausing. The overlay is **not attached to `main.gd` yet**, so no shipped build
-  shows touch buttons until the web export milestone.
+  state when pausing. M2.8 attached the overlay to `main.gd` and exported the Web build.
 
 ---
 
@@ -513,7 +578,10 @@ Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 - No music, mixing bus, ambience or voice. SFX are synthesized placeholders.
 - No adventure content, world map, bosses or progression.
 - No online play: no ENet transport, prediction, reconciliation, matchmaking or server.
-- No Android build/export, controller rebinding UI, or save profiles/unlocks.
+  The Web export is a LAN preview only; there is no hosted build, domain or TLS.
+- No Android APK/export, controller rebinding UI, or save profiles/unlocks.
+- No phone-hardware measurements yet: touch latency and mobile GPU performance are
+  unmeasured, and the LAN URL was not opened on a physical phone during M2.8.
 - Arabic covers the current front end and HUD only; there is no adventure/campaign text to
   translate yet.
 
@@ -529,6 +597,24 @@ Soak: 10,000 ticks with 4 players and no scene tree, under the 5 s budget.
 6. Settings persistence writes `user://settings.json`; tests redirect to
    `user://settings_test.json` / `user://settings_uitest.json` and clean up.
 7. The AI is a fairness-neutral test opponent, not a designed difficulty curve.
+
+---
+
+## Next major milestone: online multiplayer (owner priority)
+
+The owner wants online play before more single-player content. Scope for the first slice:
+
+1. **Transport:** ENet over UDP (`ENetMultiplayerPeer`) for a 1v1 match, plus a headless
+   dedicated server scene that runs the same deterministic `src/core` simulation.
+2. **Authority:** server owns the tick; clients send `{dir, bomb}` commands with input
+   tick numbers. 30 Hz snapshots + local prediction/reconciliation for the local player.
+3. **Lobby:** host/join by address first (no accounts); a tiny matchmaker can follow.
+4. **Proof:** two clients over a real LAN, packet-loss/latency simulation, and a recorded
+   replay hash comparison against the server — not a mocked transport.
+5. Keep the LAN Web build as the join path so a phone can be the second client once the
+   netcode is stable.
+
+This is not started; M5 remains the planned online beta milestone in the table above.
 
 ---
 
