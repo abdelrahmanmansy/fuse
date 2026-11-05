@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Tiny static server for the exported FUSE web build.
 //
-//   node tools/serve_web.mjs [--port 8080] [--dir build/web]
+//   node tools/serve_web.mjs [--port 8080] [--dir build/web] [--https]
 //
 // Binds 0.0.0.0 so a phone on the same Wi-Fi/hotspot can open the printed LAN
-// URL. No third-party dependencies; wasm gets the MIME type Godot expects.
+// URL. Godot 4.7 requires a Secure Context, so a phone must use --https with the
+// self-signed certificate from tools/make_cert.ps1. No third-party dependencies;
+// wasm gets the MIME type Godot expects.
 
-import { createServer } from "node:http";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { networkInterfaces } from "node:os";
@@ -19,6 +22,9 @@ function argValue(name, fallback) {
 
 const port = Number(argValue("--port", process.env.PORT || 8080));
 const root = resolve(argValue("--dir", "build/web"));
+const useHttps = args.includes("--https");
+const certPath = resolve(argValue("--cert", "build/certs/dev-cert.pem"));
+const keyPath = resolve(argValue("--key", "build/certs/dev-key.pem"));
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -34,7 +40,7 @@ const MIME = {
   ".worklet.js": "text/javascript; charset=utf-8",
 };
 
-const server = createServer(async (req, res) => {
+async function handleRequest(req, res) {
   try {
     const url = new URL(req.url || "/", "http://localhost");
     let pathname = decodeURIComponent(url.pathname);
@@ -60,18 +66,41 @@ const server = createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end("Not found");
   }
-});
+}
+
+let server;
+if (useHttps) {
+  let cert;
+  let key;
+  try {
+    [cert, key] = await Promise.all([readFile(certPath), readFile(keyPath)]);
+  } catch {
+    console.error(`Missing certificate files:\n  ${certPath}\n  ${keyPath}`);
+    console.error("Generate them once with:");
+    console.error("  powershell -ExecutionPolicy Bypass -File tools/make_cert.ps1");
+    process.exit(1);
+  }
+  server = createHttpsServer({ cert, key }, handleRequest);
+} else {
+  server = createHttpServer(handleRequest);
+}
 
 server.listen(port, "0.0.0.0", () => {
+  const scheme = useHttps ? "https" : "http";
   const urls = [];
   for (const list of Object.values(networkInterfaces())) {
     for (const net of list || []) {
       if (net.family === "IPv4" && !net.internal) {
-        urls.push(`http://${net.address}:${port}/`);
+        urls.push(`${scheme}://${net.address}:${port}/`);
       }
     }
   }
   console.log(`FUSE web build served from ${root}`);
-  console.log(`  local: http://localhost:${port}/`);
+  console.log(`  local: ${scheme}://localhost:${port}/`);
   for (const url of urls) console.log(`  LAN:   ${url}`);
+  if (useHttps) {
+    console.log("  self-signed certificate: accept the browser warning once");
+  } else {
+    console.log("  warning: Godot requires HTTPS on a phone; pass --https");
+  }
 });

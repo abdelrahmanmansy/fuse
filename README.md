@@ -66,26 +66,32 @@ attract demo. Menus are fully keyboard and controller navigable.
 
 ### Play on a phone (local web build)
 
-The Web export is **single-threaded** and uses the **Compatibility** renderer, so it runs
-from plain HTTP on a phone browser without cross-origin isolation headers.
+The Web export is **single-threaded** and uses the **Compatibility** renderer, so it does
+not need cross-origin isolation headers. Godot 4.7 still requires a **Secure Context**, and
+a phone does not treat the PC's LAN address as localhost, so the LAN link must be **HTTPS**.
 
 ```powershell
 # one-time: export (requires the export templates for Godot 4.7.2)
 & $godot --headless --path . --export-release "Web" build/web/index.html
 
-# every session: serve build/web on the LAN
-node tools/serve_web.mjs --port 8080
+# one-time per network change: self-signed certificate for the current IPv4s
+powershell -ExecutionPolicy Bypass -File tools/make_cert.ps1
+
+# every session: serve build/web over HTTPS on the LAN
+node tools/serve_web.mjs --https --port 8080
 ```
 
-The server prints a LAN URL such as `http://192.168.1.20:8080/`. Open it on a phone that
-is on the same Wi-Fi or hotspot. In a live 1P match the game shows a d-pad, a BOMB button
+The server prints a LAN URL such as `https://192.168.1.20:8080/`. Open it on a phone that
+is on the same Wi-Fi or hotspot. The browser warns that the certificate is self-signed;
+choose **Advanced → Proceed** once. If the PC's IP changes, rerun `make_cert.ps1` so the
+certificate covers the new address. In a live 1P match the game shows a d-pad, a BOMB button
 and a PAUSE button; the camera, HUD and pads are designed for landscape, so a portrait
 phone shows a rotate prompt instead. Touch input writes into the same `InputRouter`
 virtual slots as the keyboard, so buffering and rules are unchanged. Add `?touch=1` to
 force the pads on in a desktop browser.
 
 The host must allow inbound TCP 8080 through Windows Firewall (Windows prompts the first
-time Node listens). This is a LAN preview only: there is no hosted server, no TLS and no
+time Node listens). This is a LAN preview only: there is no hosted server, no domain and no
 online play yet.
 
 ### Language

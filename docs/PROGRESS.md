@@ -89,8 +89,9 @@ Every round still outnumbers the permanent rocks, and the unit suite asserts tha
 ### What changed for the player
 
 - **Playable in a phone browser.** The project exports to Web with the **Compatibility**
-  renderer and **single-threaded** wasm (`variant/thread_support=false`), so it runs from
-  plain HTTP on the LAN without COOP/COEP headers or a secure context.
+  renderer and **single-threaded** wasm (`variant/thread_support=false`), so it does not
+  need COOP/COEP headers. It does need a **Secure Context**, so the LAN link is served over
+  HTTPS with a self-signed development certificate (see the correction below).
 - **On-screen controls.** A translucent d-pad (bottom-left), a large **BOMB** button
   (bottom-right) and a **PAUSE** button (top-right) appear during a live 1P match. They
   write into `InputRouter`'s virtual slots, so touch shares the keyboard path, 100 ms bomb
@@ -128,21 +129,46 @@ The Web build was loaded at `http://127.0.0.1:8080/?touch=1` in the in-app Chrom
 Full 77/546 tests, the 56-check UI flow, the 180-frame smoke run and the core boundary
 guard all pass after the touch/orientation changes.
 
+### Correction after the first phone test: HTTPS is required
+
+The original M2.8 build was only checked at `http://127.0.0.1`, and browsers treat
+`localhost`/`127.0.0.1` as a Secure Context even over HTTP. A phone opening
+`http://<lan-ip>:8080/` was stopped by Godot's own feature check:
+
+> The following features required to run Godot projects on the Web are missing:
+> Secure Context - Check web server configuration (use HTTPS)
+
+The fix is local and dependency-free:
+
+- `tools/make_cert.ps1` uses the OpenSSL bundled with Git for Windows to write a
+  self-signed certificate and key under `build/certs/`, with all current IPv4 addresses as
+  Subject Alternative Names.
+- `tools/serve_web.mjs --https` serves the same build over TLS on port 8080 and prints the
+  HTTPS LAN URL. The phone accepts the certificate warning once
+  (**Advanced → Proceed**); after that the page is an HTTPS secure context and Godot boots.
+- Regenerate the certificate with `make_cert.ps1` whenever the PC's IP changes.
+
+Verified after the change: `curl -k https://192.168.40.2:8080/index.html` returns 200 and
+the PCK downloads fully; a headless Chromium run of the same URL (certificate errors
+ignored, as the phone's "Proceed" does) reports no missing features and no Secure Context
+notice.
+
 ### Not verified yet
 
-- **Actual phone hardware.** The LAN URL was not opened on the user's phone during this
-  session, so touch latency, thermal throttling and real mobile GPU performance are still
-  unmeasured. Treat the mobile build as a preview.
+- **Actual phone hardware after the HTTPS fix.** The corrected link still needs to be
+  opened on the user's phone. Touch latency, thermal throttling and real mobile GPU
+  performance remain unmeasured. Treat the mobile build as a preview.
 - **Public hosting.** The link only works while the Node server runs and the phone is on
-  the same network (the PC is on a `172.20.10.x` hotspot). No TLS, no domain, no online
-  play.
+  the same network. The certificate is self-signed (not publicly trusted), and there is no
+  domain or online play.
 
 ### How to serve it
 
 ```powershell
 cd "C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse"
-node tools/serve_web.mjs --port 8080
-# prints: LAN: http://<pc-ip>:8080/
+powershell -ExecutionPolicy Bypass -File tools/make_cert.ps1   # once per IP change
+node tools/serve_web.mjs --https --port 8080
+# prints: LAN: https://<pc-ip>:8080/
 ```
 
 Windows Firewall must allow inbound TCP 8080 for Node.
