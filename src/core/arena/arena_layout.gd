@@ -118,6 +118,18 @@ func generate(width: int, height: int, seed_value: int, spawn_count: int = 4,
 	return true
 
 
+## Fold the series/round counters into a base seed so every round of a series
+## gets its own layout. Uses the simulation PRNG (32-bit xorshift) so the result
+## is identical on every machine and can never overflow a signed 64-bit int.
+## `round_index` and `series_index` start at 1; passing 0 returns a mixed base.
+static func derive_seed(base_seed: int, round_index: int, series_index: int = 1) -> int:
+	var mixed := (base_seed & 0xFFFFFFFF) \
+		^ ((round_index * 0x9E3779B1) & 0xFFFFFFFF) \
+		^ ((series_index * 0x85EBCA77) & 0xFFFFFFFF)
+	var rng = Rng.new(mixed)
+	return rng.next_u32() & 0x7FFFFFFF
+
+
 func spawn_for(player_index: int) -> Vector2i:
 	return spawns[player_index % spawns.size()]
 

@@ -10,6 +10,9 @@ func _initialize() -> void:
 	for spec in [[15, 13], [21, 13]]:
 		for seed_value in [4242, 777, 20261031]:
 			_report(spec[0], spec[1], seed_value)
+	print("per-round seeds for a base-4242 series (round 1..5):")
+	for round_index in range(1, 6):
+		_report(21, 13, ArenaLayout.derive_seed(4242, round_index, 1))
 	quit(0)
 
 

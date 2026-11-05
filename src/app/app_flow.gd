@@ -7,6 +7,8 @@ extends RefCounted
 
 enum Screen { TITLE, MATCH, RESULTS }
 
+const ArenaLayout = preload("res://src/core/arena/arena_layout.gd")
+
 const MODE_1P := 0
 const MODE_2P := 1
 
@@ -16,6 +18,9 @@ var best_of: int = 3
 
 var wins: Array[int] = [0, 0]
 var rounds_played: int = 0
+## Counts series started since boot. Mixed into the arena seed so a rematch does
+## not replay the exact same board as the previous series.
+var series: int = 0
 var round: int = 0
 var last_winner: int = -1
 var series_over: bool = false
@@ -31,6 +36,7 @@ func begin_series(selected_mode: int) -> void:
 	mode = clampi(selected_mode, MODE_1P, MODE_2P)
 	wins = [0, 0]
 	rounds_played = 0
+	series += 1
 	round = 1
 	last_winner = -1
 	series_over = false
@@ -67,6 +73,15 @@ func series_winner() -> int:
 	if wins[0] == wins[1]:
 		return -1
 	return 0 if wins[0] > wins[1] else 1
+
+
+## Seed for the board that should be on screen. Outside a live match (title
+## attract, results) the base seed is used unchanged; during a series it is
+## folded with the round and series counters so every round gets a new arena.
+func arena_seed(base_seed: int) -> int:
+	if screen != Screen.MATCH:
+		return base_seed
+	return ArenaLayout.derive_seed(base_seed, round, series)
 
 
 ## Leave the match and return to the title screen with a clean slate.

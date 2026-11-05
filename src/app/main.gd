@@ -51,6 +51,9 @@ var sim
 var rules
 var arena
 var seed_value: int = 4242
+## Effective seed for the match on screen; the base `seed_value` folded with the
+## series/round counters so the arena changes every round and every rematch.
+var _match_seed: int = 4242
 
 var _flow
 var _settings
@@ -297,13 +300,18 @@ func _start_match() -> void:
 
 	rules = Ruleset.new()
 	arena = ArenaLayout.new()
-	if not arena.generate(rules.arena_width, rules.arena_height, seed_value, PLAYER_COUNT,
+	_match_seed = seed_value
+	# Real matches get a fresh board per round and per rematch. Shot mode keeps
+	# the explicit --seed so a documented capture command stays reproducible.
+	if _shot_path.is_empty():
+		_match_seed = _flow.arena_seed(seed_value)
+	if not arena.generate(rules.arena_width, rules.arena_height, _match_seed, PLAYER_COUNT,
 			rules.crate_density_percent):
 		push_error("arena generation failed: %s" % arena.last_error)
 		return
 
 	sim = MatchSim.new()
-	sim.setup(rules, arena, seed_value, PLAYER_COUNT)
+	sim.setup(rules, arena, _match_seed, PLAYER_COUNT)
 	sim.start()
 
 	_arena_view.build(arena.grid)
@@ -334,9 +342,9 @@ func _start_match() -> void:
 func _ensure_ai() -> void:
 	if not _shot_path.is_empty() or _flow.screen == AppFlow.Screen.TITLE:
 		for i in PLAYER_COUNT:
-			_ai[i] = SimpleAi.new(seed_value + 31 * (i + 1))
+			_ai[i] = SimpleAi.new(_match_seed + 31 * (i + 1))
 	elif _flow.mode == AppFlow.MODE_1P:
-		_ai[1] = SimpleAi.new(seed_value + 62)
+		_ai[1] = SimpleAi.new(_match_seed + 62)
 
 
 func _physics_process(delta: float) -> void:

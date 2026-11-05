@@ -2,6 +2,7 @@ extends "res://tests/case.gd"
 ## App-level flow: screen transitions, series scoring, draw handling.
 
 const AppFlow = preload("res://src/app/app_flow.gd")
+const ArenaLayout = preload("res://src/core/arena/arena_layout.gd")
 
 
 func test_starts_on_title_with_one_player_mode() -> void:
@@ -28,9 +29,23 @@ func test_begin_series_resets_and_enters_match() -> void:
 	flow.begin_series(AppFlow.MODE_2P)
 	eq(flow.screen, AppFlow.Screen.MATCH, "series starts in match")
 	eq(flow.mode, AppFlow.MODE_2P, "mode is stored")
+	eq(flow.series, 1, "first series is 1")
 	eq(flow.round, 1, "first round is 1")
 	eq(flow.rounds_played, 0, "no rounds played yet")
 	eq(flow.wins, [0, 0], "score starts level")
+
+
+func test_series_counter_advances_on_rematch_but_not_on_next_round() -> void:
+	var flow = AppFlow.new()
+	flow.begin_series(AppFlow.MODE_1P)
+	eq(flow.series, 1, "first series")
+	flow.record_round(0)
+	flow.next_round()
+	eq(flow.series, 1, "next round stays in the same series")
+	flow.begin_series(AppFlow.MODE_1P)
+	eq(flow.series, 2, "rematch starts a new series")
+	flow.back_to_title()
+	eq(flow.series, 2, "returning to title keeps the counter so the next series differs")
 
 
 func test_series_ends_when_a_player_reaches_majority() -> void:
@@ -105,6 +120,22 @@ func test_back_to_title_clears_the_series() -> void:
 	eq(flow.round, 0, "round cleared")
 	eq(flow.series_over, false, "series closed")
 	eq(flow.mode, AppFlow.MODE_2P, "mode preference survives")
+
+
+func test_arena_seed_changes_per_round_and_per_rematch() -> void:
+	var flow = AppFlow.new()
+	eq(flow.arena_seed(4242), 4242, "title attract keeps the base seed")
+	flow.begin_series(AppFlow.MODE_1P)
+	var first: int = flow.arena_seed(4242)
+	eq(first, ArenaLayout.derive_seed(4242, 1, 1), "first round seed comes from the counters")
+	flow.record_round(0)
+	flow.next_round()
+	var second: int = flow.arena_seed(4242)
+	check(second != first, "next round changes the arena seed")
+	flow.begin_series(AppFlow.MODE_1P)
+	check(flow.arena_seed(4242) != first, "a rematch changes the arena seed")
+	flow.back_to_title()
+	eq(flow.arena_seed(4242), 4242, "back on the title the attract seed is stable again")
 
 
 func test_player_label_is_one_based() -> void:

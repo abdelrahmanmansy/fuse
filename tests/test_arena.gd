@@ -47,3 +47,36 @@ func test_generated_arena_is_deterministic_and_has_safe_spawns() -> void:
 	var c = ArenaLayout.new()
 	c.generate(15, 13, 778)
 	check(a.grid.to_ascii() != c.grid.to_ascii(), "different seed => different layout")
+
+
+func test_round_seed_is_stable_and_changes_every_round() -> void:
+	var base := 4242
+	eq(ArenaLayout.derive_seed(base, 1, 1), ArenaLayout.derive_seed(base, 1, 1),
+		"same counters => same seed")
+	check(ArenaLayout.derive_seed(base, 1, 1) != ArenaLayout.derive_seed(base, 2, 1),
+		"next round changes the seed")
+	check(ArenaLayout.derive_seed(base, 1, 1) != ArenaLayout.derive_seed(base, 1, 2),
+		"a rematch changes the seed")
+
+	# No collisions across a realistic series/round range, and the value must
+	# stay positive so it can seed the arena RNG directly.
+	var seen := {}
+	for series_index in range(1, 6):
+		for round_index in range(1, 9):
+			var value := ArenaLayout.derive_seed(base, round_index, series_index)
+			check(value >= 0 and value <= 0x7FFFFFFF, "seed is positive 31-bit: %d" % value)
+			var key := "%d/%d" % [series_index, round_index]
+			check(not seen.has(value), "seed for %s is unique (clashes with %s)" % [
+				key, seen.get(value, "")])
+			seen[value] = key
+
+
+func test_every_round_generates_a_distinct_layout() -> void:
+	var layouts := {}
+	for round_index in range(1, 5):
+		var arena = ArenaLayout.new()
+		var round_seed := ArenaLayout.derive_seed(20261031, round_index, 1)
+		check(arena.generate(21, 13, round_seed, 2, 82), "round %d generates" % round_index)
+		var ascii: String = arena.grid.to_ascii()
+		check(not layouts.has(ascii), "round %d layout is unique" % round_index)
+		layouts[ascii] = true
