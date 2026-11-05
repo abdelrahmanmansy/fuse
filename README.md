@@ -3,14 +3,14 @@
 Working title for a modern **2.5D bomb-arena action game** (Atomic Bomberman-inspired),
 built in **Godot 4.7.2**. Windows first, Android after.
 
-> **Status: M2.8 — full-screen arena, classic art pass, touch/web preview (verified).**
+> **Status: M2.9 — per-round arena variation, full-screen art pass, touch/web preview (verified).**
 > Title screen with a live AI attract match → mode select → best-of series → results →
 > rematch. Pause menu, persisted settings, and event-driven procedural sound effects are
 > in. **Arabic and English ship from day one**, with RTL layout and a bundled
-> Arabic-capable font. The arena now reads like classic Bomberman: a **21×13 board that
-> fills the 16:9 frame**, grass checkerboard, terracotta brick pillars, a dense crate
-> field, white-suited characters with coloured helmets, glossy black bombs and layered
-> fire. Movement reverses instantly, input presses are latched per event and bombs are
+> Arabic-capable font. Every round of a series and every rematch gets its own **21×13
+> arena**: grass checkerboard, terracotta brick pillars, a dense crate field, white-suited
+> characters with coloured helmets, glossy black bombs and layered fire. The board fills
+> the 16:9 frame. Movement reverses instantly, input presses are latched per event and bombs are
 > buffered for 100 ms. A **single-threaded Web export** adds on-screen touch pads for
 > phones, served over the local network in a landscape layout; it is a preview, not a
 > public deployment. All art is still **code-built 3D primitives and shaders** — no
@@ -121,6 +121,8 @@ Title actions: **LOCAL VERSUS** (2 players, one keyboard or two pads), **SOLO**
 
 A series is **best of 3** by default (1 or 5 selectable in settings). Draws award no
 point but consume a round, and the round limit closes a series that cannot be decided.
+**Every round and every rematch regenerates the arena** from a seed derived from the base
+seed plus the series/round counters; `R` restarts the same round on the same board.
 
 ### Feel and input
 
@@ -180,7 +182,7 @@ $godot = "$env:LOCALAPPDATA\Programs\Godot\4.7.2\Godot_v4.7.2-stable_win64_conso
 & $godot --headless --path . --script res://tests/run_tests.gd
 ```
 
-Expected: `77 test(s), 546 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
+Expected: `81 test(s), 647 assertion(s), 0 failure(s)` then `PASS` and exit code `0`.
 Add `-- --verbose` to list each test by name.
 
 End-to-end menu test (real scene tree, synthesized key events, real AI matches to a

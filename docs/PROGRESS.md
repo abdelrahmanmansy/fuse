@@ -4,13 +4,14 @@ Updated: 2026-11-05
 Environment: Windows 11 · Godot 4.7.2 stable · Python 3.12 · Node 24 · Git
 Project: `C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse`
 
-**Status: M2.8 complete (web/touch preview verified in a desktop browser; on-phone
-confirmation pending). The game boots into a localized front end (English + Arabic with
-RTL), plays a best-of series with local 1P/2P, pause, settings and procedural SFX, and the
-arena reads like classic Bomberman (grass checkerboard, brick pillars, wooden crates,
-white-suited fighters, glossy bombs, layered fire). The **21×13 arena fills the 16:9
-frame** and its **dense crate field outnumbers the permanent pillars**. Character art is
-still code-built primitives; no music, no external models/textures. A **single-threaded Web
+**Status: M2.9 complete (per-round arena variation; web/touch preview verified in a
+desktop browser, on-phone confirmation pending). The game boots into a localized front end
+(English + Arabic with RTL), plays a best-of series with local 1P/2P, pause, settings and
+procedural SFX, and the arena reads like classic Bomberman (grass checkerboard, brick
+pillars, wooden crates, white-suited fighters, glossy bombs, layered fire). The **21×13
+arena fills the 16:9 frame**, its **dense crate field outnumbers the permanent pillars**,
+and a **new board is generated for every round and rematch**. Character art is still
+code-built primitives; no music, no external models/textures. A **single-threaded Web
 export** now runs in a phone browser with on-screen touch pads and a portrait guard.**
 
 | Milestone | State |
@@ -22,10 +23,64 @@ export** now runs in a phone browser with on-screen touch pads and a portrait gu
 | M2.6 input & feel pass | ✅ complete, committed `812d707` |
 | M2.7 full-screen arena + crate density | ✅ complete, committed `95bde82` |
 | M2.8 touch controls + web/phone preview | ✅ complete, verified in a desktop browser |
+| M2.9 per-round arena variation | ✅ complete, verified headlessly |
 | M3 vertical slice | ⬜ next |
 | M4 adventure campaign | ⬜ not started |
 | M5 online beta | ⬜ not started |
 | M6 release | ⬜ not started |
+
+---
+
+## M2.9 — per-round arena variation (verified)
+
+### What changed for the player
+
+- **The board changes every round.** Starting a series, advancing to the next round and
+  starting a rematch each regenerate the arena, so the crate field is never the same twice
+  in a session. Spawn pockets, 82% crate density, the 21×13 size and the pillar lattice are
+  unchanged.
+- **Restarting keeps the board.** `R` / "restart round" replays the current round on the
+  same layout, so a retry is a fair retry instead of a free reroll.
+- **Deterministic outputs stay reproducible.** The title attract match and `--shot`
+  captures keep the explicit base seed; only live series rounds fold in the counters.
+
+### How it works
+
+- `AppFlow.series` counts series started since boot. `AppFlow.arena_seed(base)` returns the
+  base seed outside a match and `ArenaLayout.derive_seed(base, round, series)` during play.
+- `ArenaLayout.derive_seed()` folds the counters through xorshift32, so results stay
+  positive 31-bit values and identical on every machine. No new clocks or RNG sources.
+- `main.gd` uses that one effective seed for arena generation, match simulation and the CPU
+  opponent, so all three agree on the board.
+
+### Verification evidence
+
+```
+81 test(s), 647 assertion(s), 0 failure(s)     (EXIT=0)
+UI flow: 56 check(s)                            (EXIT=0)
+boot smoke, 180 frames                          (EXIT=0, no SCRIPT ERROR)
+core boundary guard                             (11 files, EXIT=0)
+shot capture --seed=2024                        (tick=1166, bombs=1, blasts=7)
+web export                                      (EXIT=0, rebuilt)
+```
+
+Arena stats for a base-4242 series (21×13, 56 interior rocks):
+
+| Round | Derived seed | Crates | Crate : rock |
+| --- | --- | --- | --- |
+| 1 | 2038101359 | 114 | 2.04 |
+| 2 | 168639613 | 113 | 2.02 |
+| 3 | 1607689935 | 113 | 2.02 |
+| 4 | 1827810936 | 110 | 1.96 |
+| 5 | 1883213958 | 106 | 1.89 |
+
+Every round still outnumbers the permanent rocks, and the unit suite asserts that rounds
+1–4 generate distinct layouts and that no seed repeats across 5 series × 8 rounds.
+
+### Not verified yet
+
+- A full multi-round match was not driven on a physical phone; the arena change is verified
+  by unit/integration tests and headless stats, not by touching round 2 on the handset.
 
 ---
 
