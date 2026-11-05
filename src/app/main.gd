@@ -36,6 +36,8 @@ const TitleScreen = preload("res://src/ui/screens/title_screen.gd")
 const PauseMenu = preload("res://src/ui/screens/pause_menu.gd")
 const SeriesPanel = preload("res://src/ui/screens/series_panel.gd")
 const SettingsScreen = preload("res://src/ui/screens/settings_screen.gd")
+const TouchControls = preload("res://src/ui/touch_controls.gd")
+const OrientationGuard = preload("res://src/ui/orientation_guard.gd")
 
 const MatchSim = preload("res://src/core/sim/match_sim.gd")
 const SimEvent = preload("res://src/core/sim/sim_event.gd")
@@ -65,9 +67,12 @@ var _pause_menu
 var _series
 var _settings_screen
 var _audio
+var _touch
+var _orientation
 
 var _input_router
 var _ai: Dictionary = {}
+var _touch_on := false
 
 var _player_views: Dictionary = {}
 var _bomb_views: Dictionary = {}
@@ -109,6 +114,8 @@ func _ready() -> void:
 	_input_router = InputRouter.new()
 	_apply_settings()
 	_apply_locale()
+	_setup_touch_controls()
+	_setup_orientation_guard()
 
 	if _shot_path.is_empty():
 		if _capture_path.is_empty():
@@ -121,6 +128,68 @@ func _ready() -> void:
 		_flow.begin_series(AppFlow.MODE_1P)
 		_start_match()
 		_fast_forward_for_shot()
+
+
+## --- touch controls -----------------------------------------------------------
+
+func _setup_touch_controls() -> void:
+	if not _touch_available():
+		return
+	_touch = TouchControls.new()
+	_touch.name = "TouchControls"
+	add_child(_touch)
+	_touch.setup(_input_router)
+	_touch.pause_pressed.connect(func() -> void:
+		if _flow.screen == AppFlow.Screen.MATCH:
+			_set_paused(true))
+	if _hud != null:
+		_hud.set_touch_hint(true)
+
+
+## Touchscreens are always usable; web builds also expose a d-pad for phones.
+func _touch_available() -> bool:
+	if DisplayServer.is_touchscreen_available():
+		return true
+	if not OS.has_feature("web"):
+		return false
+	# JavaScriptBridge only exists in web builds, so this call is web-gated.
+	# `?touch=1` forces the pads on for desktop browser testing.
+	return bool(JavaScriptBridge.eval(
+		"(navigator.maxTouchPoints || 0) > 0 || location.search.indexOf('touch=1') >= 0"))
+
+
+func _setup_orientation_guard() -> void:
+	if _touch == null:
+		return
+	_orientation = OrientationGuard.new()
+	_orientation.name = "OrientationGuard"
+	add_child(_orientation)
+	_orientation.setup()
+	get_window().size_changed.connect(_update_orientation)
+	_update_orientation()
+
+
+func _update_orientation() -> void:
+	if _orientation == null:
+		return
+	var portrait: bool = _orientation.is_portrait()
+	_orientation.set_active(portrait)
+	_sync_touch_controls()
+
+
+## Touch buttons only belong to a live 1P match; menus and results are tapped
+## directly. 2P local still needs two pads, so it stays keyboard/pad only.
+func _sync_touch_controls() -> void:
+	if _touch == null:
+		return
+	var portrait: bool = _orientation != null and _orientation.is_active()
+	var want: bool = _shot_path.is_empty() and _capture_path.is_empty() \
+		and _flow != null and _flow.screen == AppFlow.Screen.MATCH \
+		and _flow.mode == AppFlow.MODE_1P and not _paused and not portrait
+	if want == _touch_on:
+		return
+	_touch_on = want
+	_touch.set_active(want)
 
 
 func _build_world() -> void:
@@ -287,6 +356,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	_sync_touch_controls()
 	if sim == null:
 		return
 	_update_views(delta)
@@ -376,6 +446,9 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if _input_router != null:
 			Input.flush_buffered_events()
+			# A finger may have lifted while the browser was in another tab, so
+			# drop the held touch direction instead of walking forever on return.
+			_input_router.clear_latches()
 			_input_router.suspend()
 		_accum = 0.0
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
@@ -410,7 +483,8 @@ func _apply_settings() -> void:
 	if _audio != null:
 		_audio.master = clampf(_settings.master_volume * _settings.sfx_volume, 0.0, 1.0)
 	# Headless runs have no display server; only touch the window when one exists.
-	if DisplayServer.get_name() != "headless":
+	# Browsers own their fullscreen state, and requesting it without a gesture fails.
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("web"):
 		var want_fullscreen: bool = _settings.fullscreen
 		var is_fullscreen: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 		if want_fullscreen != is_fullscreen:
@@ -421,7 +495,7 @@ func _apply_settings() -> void:
 func _apply_locale() -> void:
 	L10n.set_locale(_settings.locale if _settings != null else "en")
 	var rtl := L10n.is_rtl()
-	for screen in [_title, _pause_menu, _series, _settings_screen]:
+	for screen in [_title, _pause_menu, _series, _settings_screen, _orientation]:
 		if screen != null:
 			screen.set_rtl(rtl)
 			screen.retranslate()
@@ -468,6 +542,7 @@ func _set_paused(on: bool) -> void:
 		_pause_menu.open()
 	else:
 		_pause_menu.close()
+	_sync_touch_controls()
 
 
 func _poll_global_input() -> void:

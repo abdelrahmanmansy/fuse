@@ -11,9 +11,9 @@ const L10n = preload("res://src/app/l10n.gd")
 const UiKit = preload("res://src/ui/ui_kit.gd")
 const Dirs = preload("res://src/core/sim/dirs.gd")
 
-const BUTTON_SIZE := 112
-const GAP := 8
-const PAD_MARGIN := 34
+const BUTTON_SIZE := 168
+const GAP := 10
+const PAD_MARGIN := 40
 
 var _router
 var _root: Control
@@ -73,29 +73,29 @@ func _build() -> void:
 	_add_dir_cell(grid, Vector2i.ZERO, "")
 	_add_dir_cell(grid, Vector2i.ZERO, "")
 
-	_bomb_button = _make_button("", 168, 34)
+	_bomb_button = _make_button("", 224, 40)
 	_bomb_button.name = "BombButton"
 	_bomb_button.anchor_left = 1.0
 	_bomb_button.anchor_top = 1.0
 	_bomb_button.anchor_right = 1.0
 	_bomb_button.anchor_bottom = 1.0
-	_bomb_button.offset_left = -PAD_MARGIN - 168
-	_bomb_button.offset_top = -PAD_MARGIN - 168
+	_bomb_button.offset_left = -PAD_MARGIN - 224
+	_bomb_button.offset_top = -PAD_MARGIN - 224
 	_bomb_button.offset_right = -PAD_MARGIN
 	_bomb_button.offset_bottom = -PAD_MARGIN
 	_bomb_button.button_down.connect(_on_bomb_down)
 	_root.add_child(_bomb_button)
 
-	_pause_button = _make_button("", 130, 20)
+	_pause_button = _make_button("", 168, 26)
 	_pause_button.name = "PauseButton"
 	_pause_button.anchor_left = 1.0
 	_pause_button.anchor_top = 0.0
 	_pause_button.anchor_right = 1.0
 	_pause_button.anchor_bottom = 0.0
-	_pause_button.offset_left = -PAD_MARGIN - 130
-	_pause_button.offset_top = 20
+	_pause_button.offset_left = -PAD_MARGIN - 168
+	_pause_button.offset_top = PAD_MARGIN
 	_pause_button.offset_right = -PAD_MARGIN
-	_pause_button.offset_bottom = 80
+	_pause_button.offset_bottom = PAD_MARGIN + 168
 	_pause_button.pressed.connect(func() -> void: pause_pressed.emit())
 	_root.add_child(_pause_button)
 

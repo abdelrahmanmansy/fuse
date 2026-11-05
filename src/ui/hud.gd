@@ -11,6 +11,7 @@ var _timer: Label
 var _phase: Label
 var _banner: Label
 var _hint: Label
+var _touch_hint := false
 var _panels: Array = []
 
 
@@ -58,6 +59,12 @@ func setup(player_count: int) -> void:
 	_hint.offset_right = 620
 	_hint.offset_top = -36
 	_hint.offset_bottom = -8
+
+
+## Touch builds show a shorter hint that matches the on-screen buttons.
+func set_touch_hint(on: bool) -> void:
+	_touch_hint = on
+	retranslate()
 
 
 func update_from_sim(sim, mode: String) -> void:
@@ -150,7 +157,7 @@ func _build_panel(root: Control, index: int, player_count: int) -> Dictionary:
 
 
 func retranslate() -> void:
-	_hint.text = L10n.t("hud.hint")
+	_hint.text = L10n.t("hud.hint_touch" if _touch_hint else "hud.hint")
 	for i in _panels.size():
 		_panels[i]["name"].text = L10n.t("player") % (i + 1)
 
