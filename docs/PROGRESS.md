@@ -62,7 +62,13 @@ boot smoke, 180 frames                          (EXIT=0, no SCRIPT ERROR)
 core boundary guard                             (11 files, EXIT=0)
 shot capture --seed=2024                        (tick=1166, bombs=1, blasts=7)
 web export                                      (EXIT=0, rebuilt)
+GitHub Pages public build                       (live, HTTPS, wasm MIME ok)
 ```
+
+The public preview at **https://abdelrahmanmansy.github.io/fuse/** was loaded in the in-app
+Chromium: `window.isSecureContext === true`, the boot log reports
+`OpenGL ES 3.0 (WebGL 2.0) - Compatibility`, the status overlay clears, and there are no
+console errors. GitHub Pages serves `index.wasm` as `application/wasm`.
 
 Arena stats for a base-4242 series (21×13, 56 interior rocks):
 

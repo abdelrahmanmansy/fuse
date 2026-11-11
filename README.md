@@ -17,6 +17,9 @@ built in **Godot 4.7.2**. Windows first, Android after.
 > external models or textures, and no music yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for exactly what exists and what does not.
 
+**Play now:** **https://abdelrahmanmansy.github.io/fuse/** — public Web preview, no install
+(first load is ~40 MB).
+
 ![Title screen](docs/screenshots/m2-title-en.png)
 
 *Real captured frame from `--capture` mode — English title panel over a running AI attract
@@ -63,6 +66,20 @@ cd "C:\Users\ALMASA\OneDrive\Documents\Default Project\fuse"
 
 The game boots to the title screen; an AI-vs-AI match plays behind the menu as an
 attract demo. Menus are fully keyboard and controller navigable.
+
+### Play in a browser (public preview)
+
+A ready-to-play Web build is published with **GitHub Pages**:
+
+**https://abdelrahmanmansy.github.io/fuse/**
+
+It is the same single-threaded Compatibility build, served over trusted HTTPS, so it works
+on a phone or desktop without running the local server. The first load downloads the
+~40 MB wasm bundle, so use Wi-Fi; later loads are cached. Open it in landscape and press
+**SOLO** to play with the on-screen d-pad, BOMB and PAUSE buttons.
+
+The site is the `gh-pages` branch (exported files only, with `.nojekyll`). Re-deploy by
+exporting to `build/web` and force-pushing that directory to `gh-pages`.
 
 ### Play on a phone (local web build)
 
