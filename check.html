@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FUSE — فحص المتصفح</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 18px; background: #0b0f17; color: #e8edf7;
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #ffd166; }
+  p  { margin: 0 0 14px; color: #9fb0c9; }
+  pre { white-space: pre-wrap; word-break: break-word; background: #121a27;
+        border: 1px solid #24344d; border-radius: 10px; padding: 12px; direction: ltr;
+        text-align: left; font: 13px/1.55 ui-monospace, Consolas, monospace; }
+  .ok { color: #6ee7a8; } .bad { color: #ff7b7b; }
+  a.btn { display: inline-block; margin-top: 14px; padding: 12px 18px; border-radius: 10px;
+          background: #1f6feb; color: #fff; text-decoration: none; font-weight: 700; }
+</style>
+<h1>فحص تشغيل FUSE</h1>
+<p>افتح الرابط ده على الموبايل وابعت صورة للشاشة لو اللعبة مش شغالة.</p>
+<pre id="out">جارٍ الفحص…</pre>
+<a class="btn" href="./">افتح اللعبة</a>
+<script>
+const rows = [];
+const add = (k, v, ok) => rows.push({ k, v: String(v), ok });
+function render() {
+  const el = document.getElementById("out");
+  el.innerHTML = rows.map(r => {
+    const cls = r.ok === true ? "ok" : r.ok === false ? "bad" : "";
+    return `<span class="${cls}">${r.k}: ${r.v}</span>`;
+  }).join("\n");
+}
+add("URL", location.href);
+add("Secure context", window.isSecureContext, window.isSecureContext === true);
+add("Touch points", navigator.maxTouchPoints, navigator.maxTouchPoints > 0);
+add("Screen", `${innerWidth}x${innerHeight} dpr=${devicePixelRatio}`);
+add("User agent", navigator.userAgent);
+add("WebAssembly", typeof WebAssembly === "object", typeof WebAssembly === "object");
+
+let gl2 = null;
+try { gl2 = document.createElement("canvas").getContext("webgl2"); } catch (e) {}
+add("WebGL2", gl2 ? "yes" : "NO", !!gl2);
+if (gl2) {
+  try {
+    const dbg = gl2.getExtension("WEBGL_debug_renderer_info");
+    add("GPU", dbg ? gl2.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl2.getParameter(gl2.RENDERER));
+  } catch (e) { add("GPU", "unknown"); }
+}
+render();
+
+fetch("index.wasm", { method: "HEAD" })
+  .then(r => add("index.wasm HTTP", r.status + " / " + (r.headers.get("content-length") || "?"), r.ok))
+  .catch(e => add("index.wasm HTTP", "FAILED: " + e.message, false))
+  .finally(render);
+fetch("index.pck", { method: "HEAD" })
+  .then(r => add("index.pck HTTP", r.status + " / " + (r.headers.get("content-length") || "?"), r.ok))
+  .catch(e => add("index.pck HTTP", "FAILED: " + e.message, false))
+  .finally(render);
+</script>
+</html>
